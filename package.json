@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "从 DOMjudge / HOJ 本地部署拉取比赛榜单，预处理为统一滚榜数据文件，并进行现场滚榜",
+  "license": "MIT",
   "type": "commonjs",
   "main": "server.js",
   "repository": {
