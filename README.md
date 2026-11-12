@@ -53,6 +53,8 @@ HOST=0.0.0.0 PORT=8080 npm start
 | `/setup.html` 配置中心 | **所有可调项集中在这里**：数据源、拉取默认值、奖牌名额、播放默认值、快捷键键位 |
 | `/board.html` 大屏 | 现场滚榜。控制条只留播放控制与设置入口，其余收进设置抽屉 |
 
+工作台优先显示比赛数据文件，支持按名称 / ID 搜索和按来源筛选；下方可拉取比赛、选择或拖入 JSON 文件。配置页的保存栏在窄屏下也保持可见，修改字段后会显示未保存状态。管理台支持页面内登录、退出、键盘焦点与深浅主题；这些样式独立于滚榜大屏。
+
 配置保存在 `data/config.json`，大屏与工作台读取同一份。
 
 ---
@@ -357,6 +359,8 @@ GET /api/get-contest-scroll-board-submission?cid={cid}&removeStar=false
 ```bash
 npm test          # 引擎、适配器、导入时间单位、XSS、封榜边界、重定向凭据、管理权限及会话回归
 npm run test:ui   # UI 全量回归（需先 npm start + 本机装有 Chrome）：主题、纯净模式、快捷键、配置页、动效、凭据检查
+npm run test:admin # 管理界面交互与三种宽度的双主题截图；需要管理口令，使用模拟 OJ
+npm run test:performance # 纯净模式真实播放：8× / 极速、两种粒度、4K 和 CPU 4× 降速，输出帧间隔与长任务
 npm run test:fx        # 动效连续性专项：逐档位统计动画重播次数（应为 0）
 npm run test:frames    # 播放流畅度专项：统计真实播放时的帧间隔与掉帧率
 npm run mock      # 启动模拟 OJ（http://127.0.0.1:8791）
@@ -365,6 +369,10 @@ npm run mock      # 启动模拟 OJ（http://127.0.0.1:8791）
 `npm run test:ui` 用 Chrome DevTools Protocol 驱动真实浏览器跑一遍关键交互，把结果打印成 JSON 并把截图写到 `data/ui-shots/`；没装 Chrome 或服务没启动时会自动跳过而不是报错。
 
 UI 管理回归需要在测试进程设置与服务端相同的 `ROLLBOARD_ADMIN_TOKEN`；使用独立数据目录时，服务与测试同时设置同一个 `ROLLBOARD_DATA`，避免测试修改日常比赛配置。
+
+`test:admin` 也需要以上两个环境变量，并会在隔离数据目录导入文件、添加本机模拟数据源及保存配置。上述浏览器脚本需 Node ≥ 22；可用 `ROLLBOARD_BASE` 指定服务地址、`CHROME_PATH` 指定浏览器路径。`test:performance` 不需要管理权限，但服务中须已有比赛文件。
+
+高速滚榜优化包括：缓存滚动目标，避免每步读取 `scrollTop` 强制排版；极速档固定已禁用的过渡预算，不再反复改变根 CSS 变量；只写入发生变化的成绩、奖牌与名次。纯净模式的行位移动画使用实测行高。低性能设备仍可能出现绘制长帧，不能仅凭「没有跳步」判断不卡顿，应结合 rAF 帧间隔与长任务一起看。性能脚本中的 `dropRatio` 是超过 30ms 的帧间隔比例，不是硬件显示器的丢帧计数。
 
 其中三项是**「跳步」专项防回归断言**，任何一条被打破都会让测试直接失败：
 

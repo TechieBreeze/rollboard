@@ -28,7 +28,15 @@
       const fromLink = fragment.get('admin');
       if (fromLink !== null) history.replaceState(null, '', location.pathname + location.search);
       const session = await request('/api/session');
-      if (session.authenticated) return true;
+      if (session.authenticated) { if (window.RollAdmin) window.RollAdmin.markLoggedIn(true); return true; }
+      const authenticate = (token) => request('/api/session', { method: 'POST', body: { token } });
+      if (window.RollAdmin) {
+        let authenticated = false;
+        if (fromLink) { try { await authenticate(fromLink); authenticated = true; } catch (e) { /* 过期链接可重新登录 */ } }
+        if (!authenticated) authenticated = await window.RollAdmin.login(authenticate);
+        window.RollAdmin.markLoggedIn(authenticated);
+        return authenticated;
+      }
       const token = fromLink || window.prompt('请输入服务启动时显示的管理口令（大屏观看无需登录）：');
       if (!token) return false;
       await request('/api/session', { method: 'POST', body: { token } });

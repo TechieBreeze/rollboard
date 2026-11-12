@@ -21,6 +21,7 @@
   /* ------------------------------ 数据源 ------------------------------ */
   async function loadSources() {
     sources = await API.get('/api/sources');
+    if ($('sourceCount')) $('sourceCount').textContent = sources.length;
     const sel = $('fSource');
     const prev = sel.value;
     sel.innerHTML = sources.length
@@ -111,11 +112,11 @@
     } finally { btn.disabled = false; $('fetchSpin').hidden = true; }
   }
 
-  async function doTest() {
+  async function doTest(listOnly = false) {
     const sourceId = $('fSource').value, contestId = $('fContest').value.trim();
     if (!sourceId) return toast('请先选择数据源', true);
     try {
-      if (contestId) {
+      if (contestId && !listOnly) {
         const r = await API.post('/api/test', { sourceId, contestId, auth: authPayload() });
         showResult($('fetchResult'), `<h4>✓ 连接成功</h4><div style="font-size:12.5px;line-height:1.9">比赛 ID：<code>${esc(r.id)}</code><br>题目数：${esc(r.problemCount ?? '—')}<br>开赛：${esc(r.startTime || '—')}<br>封榜：${esc(r.freezeTime || '—')}<br>打星队伍：${esc(r.starUsers ?? '—')}</div>`, 'good');
       } else {
@@ -145,22 +146,30 @@
 
   function renderFiles() {
     const tb = $('fileTable').querySelector('tbody');
+    if ($('fileCount')) $('fileCount').textContent = files.length;
+    if ($('pendingCount')) $('pendingCount').textContent = files.reduce((n, f) => n + f.summary.pendingSubmissions, 0);
+    const query = String(($('fileSearch') && $('fileSearch').value) || '').trim().toLowerCase();
+    const kind = ($('fileKind') && $('fileKind').value) || 'all';
+    const shown = files.filter((f) => (kind === 'all' || f.sourceType === kind) &&
+      (!query || (f.title + ' ' + f.id + ' ' + f.contestId).toLowerCase().includes(query)));
+    if ($('visibleFileCount')) $('visibleFileCount').textContent = `${shown.length} / ${files.length} 个文件`;
     if (!files.length) {
-      tb.innerHTML = '<tr><td colspan="7" class="empty">尚未生成任何数据文件</td></tr>';
+      tb.innerHTML = '<tr><td colspan="7" class="empty">还没有比赛数据。下方可拉取比赛、导入文件，或试用演示数据。</td></tr>';
       return;
     }
-    tb.innerHTML = files.map((f) => {
+    if (!shown.length) { tb.innerHTML = '<tr><td colspan="7" class="empty">没有匹配的比赛，请调整搜索内容或数据来源。</td></tr>'; return; }
+    tb.innerHTML = shown.map((f) => {
       const tagCls = f.sourceType === 'hoj' ? 'hoj' : f.sourceType === 'demo' ? 'demo' : (f.sourceType === 'domjudge' ? '' : 'generic');
       const v = f.validation || {};
       const vCls = v.consistent === true ? 'pill' : (v.consistent === false ? 'pill warn' : 'pill none');
       const vTxt = v.consistent === true ? '一致' : (v.consistent === false ? '有差异' : '未校验');
       return `<tr>
         <td><div class="t-title">${esc(f.title)}</div><div class="t-sub">${esc(f.id)}.rboard.json · ${(f.size / 1024).toFixed(1)} KB</div></td>
-        <td><span class="tag ${tagCls}">${esc(f.sourceType.toUpperCase())}</span><div class="t-sub">${esc(f.contestId || '')}</div></td>
-        <td>${f.summary.teamCount} 队 / ${f.summary.problemCount} 题</td>
-        <td><b>${f.summary.pendingSubmissions}</b> 提交<div class="t-sub">${f.summary.pendingCells} 个格子</div></td>
-        <td><span class="${vCls}" title="${esc(v.note || '')}">${vTxt}</span></td>
-        <td class="t-sub">${esc(window.fmtTime(f.fetchedAt))}</td>
+        <td data-label="来源"><span class="tag ${tagCls}">${esc(f.sourceType.toUpperCase())}</span><div class="t-sub">${esc(f.contestId || '')}</div></td>
+        <td data-label="比赛规模">${f.summary.teamCount} 队 / ${f.summary.problemCount} 题</td>
+        <td data-label="待揭晓"><b>${f.summary.pendingSubmissions}</b> 提交<div class="t-sub">${f.summary.pendingCells} 个格子</div></td>
+        <td data-label="成绩校验"><span class="${vCls}" title="${esc(v.note || '')}">${vTxt}</span></td>
+        <td data-label="生成时间" class="t-sub">${esc(window.fmtTime(f.fetchedAt))}</td>
         <td class="right"><div class="row-actions">
           <a class="btn btn-primary" style="padding:6px 11px" href="/board.html?id=${encodeURIComponent(f.id)}" target="_blank">滚榜</a>
           <a class="btn btn-ghost" style="padding:6px 10px" href="/api/files/${encodeURIComponent(f.id)}/download">下载</a>
@@ -170,8 +179,8 @@
     }).join('');
     tb.querySelectorAll('[data-file="del"]').forEach((b) => b.addEventListener('click', async () => {
       if (!confirm('确定删除该滚榜数据文件？此操作不可恢复。')) return;
-      await API.del('/api/files/' + encodeURIComponent(b.dataset.id));
-      await loadFiles(); toast('文件已删除');
+      try { await API.del('/api/files/' + encodeURIComponent(b.dataset.id)); await loadFiles(); toast('文件已删除'); }
+      catch (e) { toast('删除失败：' + e.message, true); }
     }));
   }
 
@@ -208,20 +217,28 @@
   function bind() {
     $('refreshFiles').onclick = loadFiles;
     $('fetchBtn').onclick = doFetch;
-    $('testBtn').onclick = doTest;
-    $('listContestBtn').onclick = doTest;
+    $('testBtn').onclick = () => doTest(false);
+    $('listContestBtn').onclick = () => doTest(true);
+    if ($('fileSearch')) $('fileSearch').oninput = renderFiles;
+    if ($('fileKind')) $('fileKind').onchange = renderFiles;
     $('demoBtn').onclick = () => doDemo(false);
     $('importBtn').onclick = doImport;
     $('clearImport').onclick = () => { $('importText').value = ''; $('importResult').hidden = true; };
     const dz = $('dropzone');
+    const readFile = (f) => {
+      if (!f) return;
+      if (f.size > 32 * 1024 * 1024) return toast('文件超过 32 MB，请精简后再导入', true);
+      const reader = new FileReader();
+      reader.onload = () => { $('importText').value = reader.result; toast('已读入 ' + f.name + '，点击「识别并导入」'); };
+      reader.onerror = () => toast('文件读取失败，请重新选择', true);
+      reader.readAsText(f, 'utf8');
+    };
+    if ($('importFile')) $('importFile').onchange = (e) => { readFile(e.target.files[0]); e.target.value = ''; };
+    dz.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('importFile').click(); } };
     ['dragenter', 'dragover'].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('over'); }));
     ['dragleave', 'drop'].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('over'); }));
     dz.addEventListener('drop', (e) => {
-      const f = e.dataTransfer.files[0];
-      if (!f) return;
-      const reader = new FileReader();
-      reader.onload = () => { $('importText').value = reader.result; toast('已读入 ' + f.name + '，点击「识别并导入」'); };
-      reader.readAsText(f, 'utf8');
+      readFile(e.dataTransfer.files[0]);
     });
     document.querySelectorAll('.nav-item').forEach((a) => a.addEventListener('click', () => {
       document.querySelectorAll('.nav-item').forEach((x) => x.classList.remove('active'));

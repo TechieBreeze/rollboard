@@ -19,6 +19,8 @@
     "dev": "node server.js",
     "test": "node --test tests/*.test.js",
     "test:ui": "node tests/ui-regression.js",
+    "test:admin": "node tests/admin-ui.js",
+    "test:performance": "node tests/board-performance.js",
     "test:fx": "node tests/fx-probe.js",
     "test:frames": "node tests/fx-frames.js",
     "mock": "node tests/mock-oj.js"

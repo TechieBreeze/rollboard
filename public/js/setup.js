@@ -9,6 +9,12 @@
 
   /** 凭据只存在浏览器会话里，服务端与磁盘都不保存 */
   const AUTH_KEY = 'rollboard.auth';
+  function markDirty(dirty = true) {
+    const status = $('saveState');
+    if (!status) return;
+    status.textContent = dirty ? '有未保存的修改' : '配置已保存';
+    status.classList.toggle('dirty', dirty);
+  }
 
   function toast(msg, isErr) {
     const el = $('toast');
@@ -34,7 +40,7 @@
   function renderSources() {
     const box = $('sourceList');
     if (!sources.length) {
-      box.innerHTML = '<div class="panel" style="grid-column:1/-1;color:var(--ui-muted);text-align:center;padding:28px">还没有数据源。点击右上角「新增数据源」连接本机 DOMjudge 或 HOJ。</div>';
+      box.innerHTML = '<div class="source-empty">尚未连接比赛系统。点击「新增数据源」添加 HOJ 或 DOMjudge。</div>';
       return;
     }
     box.innerHTML = sources.map((s) => `
@@ -71,9 +77,10 @@
     $('sTimeout').value = source ? source.timeout : 20000;
     $('sNote').value = source ? source.note : '';
     $('sourceModal').hidden = false;
+    if (window.RollAdmin) window.RollAdmin.activateModal($('sourceModal'));
     $('sName').focus();
   }
-  function closeModal() { $('sourceModal').hidden = true; editingId = null; }
+  function closeModal() { $('sourceModal').hidden = true; editingId = null; if (window.RollAdmin) window.RollAdmin.closeModal(); }
 
   async function saveSource() {
     const body = {
@@ -108,7 +115,7 @@
         parts.push(
           `<div class="key-row">
             <span class="kr-label"><span class="kr-group">${g}</span>${a.label}</span>
-            <div class="key-input${combo ? '' : ' empty'}" data-action="${esc(a.id)}" tabindex="0">${combo ? K.labelOf(combo) : '未设置'}</div>
+            <div class="key-input${combo ? '' : ' empty'}" data-action="${esc(a.id)}" tabindex="0" role="button" aria-label="${esc(a.label)}：${esc(combo ? K.labelOf(combo) : '未设置')}，按回车修改">${combo ? K.labelOf(combo) : '未设置'}</div>
           </div>`
         );
       }
@@ -117,6 +124,9 @@
     box.querySelectorAll('.key-input').forEach((el) => {
       el.addEventListener('click', () => startRecording(el));
       el.addEventListener('keydown', (e) => {
+        if (!recording && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault(); e.stopPropagation(); startRecording(el); return;
+        }
         if (recording === el.dataset.action) {
           e.preventDefault();
           e.stopPropagation();
@@ -145,12 +155,16 @@
     el.classList.remove('recording');
     if (combo) {
       cfg.keys[action] = combo;
+      markDirty();
       el.textContent = K.labelOf(combo);
       el.classList.remove('empty');
     } else {
-      el.textContent = '未设置';
-      el.classList.add('empty');
+      const previous = cfg.keys[action] || '';
+      el.textContent = previous ? K.labelOf(previous) : '未设置';
+      el.classList.toggle('empty', !previous);
     }
+    const label = (K.ACTIONS.find((a) => a.id === action) || { label: action }).label;
+    el.setAttribute('aria-label', label + '：' + el.textContent + '，按回车修改');
   }
 
   /** 全局监听录制用的按键 */
@@ -237,6 +251,7 @@
       else sessionStorage.removeItem(AUTH_KEY);
       const next = await API.put('/api/config', patch);
       cfg = next;
+      markDirty(false);
       $('cPass').value = '';
       toast(pwd ? '配置已保存（密码仅存于本次浏览器会话）' : '配置已保存');
     } catch (e) {
@@ -252,6 +267,7 @@
       cfg = await API.del('/api/config');
       fillForm();
       renderKeys();
+      markDirty(false);
       toast('已恢复默认配置');
     } catch (e) { toast('重置失败：' + e.message, true); }
   }
@@ -259,12 +275,17 @@
   async function resetKeys() {
     if (!confirm('恢复默认键位？')) return;
     cfg.keys = Object.assign({}, K.DEFAULT_KEYS);
+    markDirty();
     renderKeys();
     toast('键位已恢复默认，记得点「保存配置」');
   }
 
   /* ------------------------------ 绑定 ------------------------------ */
   function bind() {
+    document.querySelectorAll('.setup-main input, .setup-main select').forEach((el) => {
+      el.addEventListener('input', () => markDirty());
+      el.addEventListener('change', () => markDirty());
+    });
     $('addSourceBtn').onclick = () => openModal(null);
     $('closeModal').onclick = closeModal;
     $('cancelModal').onclick = closeModal;

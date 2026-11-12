@@ -10,48 +10,44 @@
 <link rel="stylesheet" href="/css/setup.css">
 <script src="/js/theme.js"></script>
 </head>
-<body>
+<body class="admin-page">
+<a class="skip-link" href="#main">跳到主要内容</a>
 <div class="setup-shell">
   <aside class="setup-side">
     <div class="brand">
       <div class="brand-mark">RB</div>
       <div>
         <div class="brand-name">RollBoard Studio</div>
-        <div class="brand-sub">配置中心</div>
+        <div class="brand-sub">CONTEST WORKSPACE</div>
       </div>
     </div>
-    <nav class="setup-nav">
+    <nav class="setup-nav" aria-label="配置导航">
       <a class="setup-nav-item active" href="#sources"><span class="ni">01</span> 数据源</a>
       <a class="setup-nav-item" href="#defaults"><span class="ni">02</span> 拉取默认值</a>
       <a class="setup-nav-item" href="#medals"><span class="ni">03</span> 奖牌名额</a>
       <a class="setup-nav-item" href="#board"><span class="ni">04</span> 播放默认值</a>
       <a class="setup-nav-item" href="#keys"><span class="ni">05</span> 快捷键</a>
     </nav>
-    <div class="setup-foot">
-      <div class="side-hint">配置保存在本机 <code>data/config.json</code></div>
-      <div class="setup-foot-actions">
-        <button class="btn btn-ghost" id="resetCfgBtn">恢复默认</button>
-        <button class="btn btn-primary" id="saveCfgBtn">保存配置</button>
-      </div>
-    </div>
+    <a class="side-back" href="/">← 返回比赛工作台</a>
   </aside>
 
-  <main class="setup-main">
+  <main class="setup-main" id="main">
     <header class="topbar">
       <div>
-        <h1>配置</h1>
-        <p>这里集中管理所有可调项。滚榜大屏会自动读取其中的播放默认值。</p>
+        <h1>配置中心</h1>
+        <p>连接比赛系统，设置奖牌名额与现场播放偏好。</p>
       </div>
       <div class="topbar-actions">
+        <button class="btn btn-ghost" id="adminSessionBtn" type="button">登录</button>
         <button class="btn" id="themeBtnTop" title="切换深色 / 浅色主题（T）">◐ 浅色</button>
-        <a class="btn btn-primary btn-lg" href="/" target="_blank">← 返回工作台</a>
+        <a class="btn btn-primary btn-lg" href="/">返回工作台</a>
       </div>
     </header>
 
     <!-- 数据源 -->
     <section class="section" id="sources">
       <div class="sec-head">
-        <div><h2>01 · 数据源</h2><p>配置本机 / 内网部署的 OJ 地址。密码只在本次请求使用，不会写入磁盘。</p></div>
+        <div><h2>数据源</h2><p>配置本机 / 内网部署的 OJ 地址。连接凭据仅保留在本次浏览器会话中。</p></div>
         <button class="btn" id="addSourceBtn">＋ 新增数据源</button>
       </div>
       <div id="sourceList" class="source-grid"></div>
@@ -60,7 +56,7 @@
     <!-- 拉取默认值 -->
     <section class="section" id="defaults">
       <div class="sec-head">
-        <div><h2>02 · 拉取默认值</h2><p>新拉取比赛时自动填入这里的值，省去每次重复输入。</p></div>
+        <div><h2>拉取默认值</h2><p>新拉取比赛时自动填入这里的值，省去每次重复输入。</p></div>
       </div>
       <div class="panel">
         <div class="form-grid">
@@ -103,7 +99,7 @@
     <!-- 奖牌 -->
     <section class="section" id="medals">
       <div class="sec-head">
-        <div><h2>03 · 奖牌名额</h2><p>决定滚榜时会在哪个名次触发金银铜奖的全屏展示页。</p></div>
+        <div><h2>奖牌与范围</h2><p>决定滚榜时会在哪个名次触发金银铜奖的全屏展示页。</p></div>
       </div>
       <div class="panel">
         <div class="medal-row">
@@ -120,7 +116,7 @@
     <!-- 播放默认值 -->
     <section class="section" id="board">
       <div class="sec-head">
-        <div><h2>04 · 播放默认值</h2><p>打开大屏时自动应用的初始状态，现场仍可在控制条临时调整。</p></div>
+        <div><h2>播放偏好</h2><p>打开大屏时自动应用的初始状态，现场仍可在控制条临时调整。</p></div>
       </div>
       <div class="panel">
         <div class="form-grid">
@@ -169,20 +165,24 @@
     <!-- 快捷键 -->
     <section class="section" id="keys">
       <div class="sec-head">
-        <div><h2>05 · 快捷键</h2><p>现场操作全靠键盘，这里可以改成你顺手的组合。点击输入框后按下想要的键即可录制。</p></div>
+        <div><h2>快捷键</h2><p>现场操作全靠键盘，这里可以改成你顺手的组合。点击输入框后按下想要的键即可录制。</p></div>
         <button class="btn btn-ghost" id="resetKeysBtn">恢复默认键位</button>
       </div>
       <div class="panel">
         <div id="keyList" class="key-list"></div>
       </div>
     </section>
+    <div class="save-dock" role="region" aria-label="保存配置">
+      <span id="saveState" role="status">配置已保存</span>
+      <div class="actions"><button class="btn btn-ghost" id="resetCfgBtn">恢复默认</button><button class="btn btn-primary" id="saveCfgBtn">保存配置 <kbd>Ctrl S</kbd></button></div>
+    </div>
   </main>
 </div>
 
 <!-- 数据源弹窗 -->
-<div class="modal-mask" id="sourceModal" hidden>
+<div class="modal-mask" id="sourceModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden>
   <div class="modal">
-    <div class="modal-head"><h3 id="modalTitle">新增数据源</h3><button class="icon-btn" id="closeModal">×</button></div>
+    <div class="modal-head"><h3 id="modalTitle">新增数据源</h3><button class="icon-btn" id="closeModal" aria-label="关闭数据源编辑">×</button></div>
     <div class="form-grid">
       <label class="field"><span>名称</span><input id="sName" placeholder="本机 DOMjudge"></label>
       <label class="field"><span>类型</span><select id="sType"><option value="domjudge">DOMjudge (v4 / Contest API)</option><option value="hoj">HOJ (Hcode Online Judge)</option></select></label>
@@ -198,10 +198,11 @@
   </div>
 </div>
 
-<div id="toast" class="toast" hidden></div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 <script src="/js/api.js"></script>
 <script src="/js/theme-ui.js"></script>
 <script src="/js/keys.js"></script>
+<script src="/js/admin.js"></script>
 <script src="/js/setup.js"></script>
 </body>
 </html>

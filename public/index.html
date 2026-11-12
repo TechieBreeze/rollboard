@@ -11,20 +11,22 @@
 <script src="/vendor/schema.js"></script>
 <script src="/vendor/engine.js"></script>
 </head>
-<body>
+<body class="admin-page">
+<a class="skip-link" href="#main">跳到主要内容</a>
 <div class="shell">
   <aside class="sidebar">
     <div class="brand">
       <div class="brand-mark">RB</div>
       <div>
         <div class="brand-name">RollBoard Studio</div>
-        <div class="brand-sub">滚榜工作台 · v1.0</div>
+        <div class="brand-sub">CONTEST WORKSPACE</div>
       </div>
     </div>
-    <nav class="nav">
+    <nav class="nav" aria-label="工作台导航">
       <a class="nav-item active" href="#files"><span class="ni">01</span> 数据文件</a>
-      <a class="nav-item" href="#import"><span class="ni">02</span> 导入 / 演示</a>
-      <a class="nav-item" href="#schema"><span class="ni">03</span> 格式说明</a>
+      <a class="nav-item" href="#quick"><span class="ni">02</span> 拉取比赛</a>
+      <a class="nav-item" href="#import"><span class="ni">03</span> 导入数据</a>
+      <a class="nav-item" href="#schema"><span class="ni">04</span> 格式参考</a>
       <a class="nav-item" href="/setup.html"><span class="ni">⚙</span> 配置中心</a>
     </nav>
     <div class="side-foot">
@@ -35,30 +37,54 @@
     </div>
   </aside>
 
-  <main class="main">
+  <main class="main" id="main">
     <header class="topbar">
       <div>
-        <h1>比赛数据 → 统一滚榜文件 → 现场滚榜</h1>
-        <p>从本地部署的 DOMjudge / HOJ 拉取指定比赛，重建封榜状态，生成可离线播放的 <code>.rboard.json</code></p>
+        <h1>比赛工作台</h1>
+        <p>准备比赛数据，检查成绩，然后进入现场滚榜。</p>
       </div>
       <div class="topbar-actions">
+        <button class="btn btn-ghost" id="adminSessionBtn" type="button">登录</button>
         <button class="btn" id="themeBtnTop" title="切换深色 / 浅色主题（T）">◐ 浅色</button>
         <a class="btn" href="/setup.html" title="数据源、默认值、快捷键等全部可调项">⚙ 配置</a>
         <a class="btn btn-primary btn-lg" id="openBoard" href="/board.html" target="_blank">打开滚榜大屏 ↗</a>
       </div>
     </header>
 
-    <!-- 快速操作 -->
+    <div class="workspace-summary" aria-label="工作台概览">
+      <div><span class="summary-number" id="fileCount">—</span><span>个数据文件</span></div>
+      <div><span class="summary-number" id="pendingCount">—</span><span>条待揭晓提交</span></div>
+      <div><span class="summary-number" id="sourceCount">—</span><span>个数据源</span></div>
+    </div>
+    <section class="section" id="files">
+      <div class="sec-head">
+        <div><h2>数据文件</h2><p>选择一场比赛，检查校验结果后打开大屏。</p></div>
+        <button class="btn btn-ghost" id="refreshFiles">刷新</button>
+      </div>
+      <div class="library-tools">
+        <label class="search-field"><span>查找比赛</span><input id="fileSearch" type="search" placeholder="搜索比赛名称或 ID" autocomplete="off"></label>
+        <label class="filter-field"><span>数据来源</span><select id="fileKind"><option value="all">全部来源</option><option value="domjudge">DOMjudge</option><option value="hoj">HOJ</option><option value="generic">导入文件</option><option value="demo">演示数据</option></select></label>
+        <span class="list-count" id="visibleFileCount" aria-live="polite"></span>
+      </div>
+      <div class="panel no-pad">
+        <table class="table" id="fileTable">
+          <thead><tr><th>比赛</th><th>来源</th><th>规模</th><th>待揭示</th><th>校验</th><th>生成时间</th><th class="right">操作</th></tr></thead>
+          <tbody><tr><td colspan="7" class="empty">尚未生成任何数据文件</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+    <div class="work-grid">
     <section class="section" id="quick">
       <div class="sec-head">
-        <div><h2>快速拉取</h2><p>填入比赛 ID 即可拉取；常用参数可在<a href="/setup.html" target="_blank">配置中心</a>预设为默认值。</p></div>
-        <a class="btn" href="/setup.html">更多设置</a>
+        <div><h2>拉取比赛</h2><p>连接 HOJ 或 DOMjudge，生成可独立播放的数据文件。</p></div>
+        <a class="btn" href="/setup.html">数据源设置</a>
       </div>
       <div class="panel">
         <div class="form-grid">
           <label class="field">
             <span>数据源</span>
             <select id="fSource"></select>
+            <a class="field-link" href="/setup.html#sources">管理数据源 ↗</a>
           </label>
           <label class="field">
             <span>比赛 ID / CID</span>
@@ -68,11 +94,11 @@
             </div>
           </label>
           <label class="field">
-            <span>API 用户名 <em>（DOMjudge 需 jury/admin）</em></span>
+            <span>API 用户名 <em>DOMjudge 需 jury/admin</em></span>
             <input id="fUser" placeholder="留空表示匿名访问" autocomplete="off">
           </label>
           <label class="field">
-            <span>API 密码 / Token <em>（仅存于本次浏览器会话，不落盘）</em></span>
+            <span>API 密码 <em>仅用于本次会话</em></span>
             <input id="fPass" type="password" placeholder="留空表示不记忆" autocomplete="new-password">
           </label>
           <label class="field wide">
@@ -89,47 +115,32 @@
         <div id="fetchResult" class="result" hidden></div>
       </div>
     </section>
-
-    <!-- 文件 -->
-    <section class="section" id="files">
-      <div class="sec-head">
-        <div><h2>01 · 已生成的滚榜数据文件</h2><p>每个文件都是自包含的，复制出去即可在另一台机器上离线滚榜。</p></div>
-        <button class="btn btn-ghost" id="refreshFiles">刷新</button>
-      </div>
-      <div class="panel no-pad">
-        <table class="table" id="fileTable">
-          <thead><tr><th>比赛</th><th>来源</th><th>规模</th><th>待揭示</th><th>校验</th><th>生成时间</th><th class="right">操作</th></tr></thead>
-          <tbody><tr><td colspan="7" class="empty">尚未生成任何数据文件</td></tr></tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- 导入 -->
     <section class="section" id="import">
       <div class="sec-head">
-        <div><h2>02 · 导入 / 演示数据</h2><p>已经从 OJ 导出过 JSON？直接粘贴或拖入，自动识别格式并转成统一文件。</p></div>
-        <button class="btn btn-accent" id="demoBtn">生成演示比赛</button>
+        <div><h2>导入数据</h2><p>上传已有文件，或粘贴从比赛系统导出的 JSON。</p></div>
+        <button class="btn btn-accent" id="demoBtn">试用演示数据</button>
       </div>
       <div class="panel">
-        <div class="dropzone" id="dropzone">
+        <label class="dropzone" id="dropzone" for="importFile" tabindex="0" role="button">
+          <input id="importFile" type="file" accept=".json,application/json" class="visually-hidden" tabindex="-1">
           <div class="dz-icon">⇪</div>
-          <div><strong>拖入 .json 文件</strong>，或在下方粘贴内容</div>
+          <div><strong>选择或拖入 .json 文件</strong>，或在下方粘贴内容</div>
           <div class="dz-hint">支持 rollboard/1 · DOMjudge 端点响应集合 · HOJ info + submissions</div>
-        </div>
+        </label>
+        <label class="field" for="importText"><span>JSON 内容</span></label>
         <textarea id="importText" rows="6" placeholder='粘贴原始 JSON，例如 { "contest": {...}, "problems": [...], "teams": [...], "submissions": [...], "judgements": [...] }'></textarea>
         <div class="actions">
-          <input id="importId" class="mini-input" placeholder="文件 ID（可留空）">
+          <input id="importId" class="mini-input" aria-label="导入文件 ID" placeholder="文件 ID（可留空）">
           <button class="btn" id="importBtn">识别并导入</button>
           <button class="btn btn-ghost" id="clearImport">清空</button>
         </div>
         <div id="importResult" class="result" hidden></div>
       </div>
     </section>
-
-    <!-- 格式说明 -->
+    </div>
     <section class="section" id="schema">
-      <div class="sec-head"><div><h2>03 · 统一数据格式 rollboard/1</h2><p>数据源与滚榜引擎完全解耦：适配器负责产出，引擎只消费这份文件。</p></div></div>
-      <div class="panel schema-panel">
+      <div class="sec-head"><div><h2>数据格式参考</h2><p>需要手动处理数据时，可展开查看字段说明。</p></div></div>
+      <details class="panel schema-panel"><summary>rollboard/1 字段与示例</summary>
         <pre><code>{
   "schema": "rollboard/1",
   "meta": {
@@ -145,7 +156,7 @@
   // 封榜瞬间已公开的状态：attempts = AC 前错误提交数
   "frozen": { "1": { "A": { "attempts": 1, "solved": true, "solveSec": 1240 } } },
 
-  // 仅需「待揭示」的提交：封榜后提交 + 封榜时尚未判定的提交
+  // 仅需「待揭示」的提交：封榜后提交 + 拉取时仍无判定结果的提交
   "submissions": [
     { "id": "s812", "teamId": "1", "problemId": "F", "timeSec": 15230,
       "verdict": "AC", "penalty": true }
@@ -157,14 +168,15 @@
           <div><b>引擎规则</b><br>焦点从最后一名逐行上移：每个揭晓都是「先高亮格子 → 下一步揭晓」；排名变动时该行上移、焦点留在原位交给被挤下来的队伍；空行不跳过（单独一步），下一步才移动焦点；一血 / 获奖单独展示。所有步骤与榜单帧在加载时一次性预计算</div>
           <div><b>交叉校验</b><br>DOMjudge 适配器会用 jury 榜单核对重建出的最终通过数与总罚时</div>
         </div>
-      </div>
+      </details>
     </section>
   </main>
 </div>
 
-<div id="toast" class="toast" hidden></div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 <script src="/js/api.js"></script>
 <script src="/js/theme-ui.js"></script>
+<script src="/js/admin.js"></script>
 <script src="/js/app.js"></script>
 </body>
 </html>

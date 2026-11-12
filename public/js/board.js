@@ -8,7 +8,6 @@
   let rowEls = new Map(), cellEls = new Map(), metaEls = new Map();
   let audioCtx = null, finaleShown = false, splashActive = false;
   let displayedFrame = null, displayedOrder = [], highlighted = { rows: [], cells: [] };
-  let rowHeight = 46;
   let pureMode = false, drawerOpen = false, helpOpen = false;
   let prevFocusTeamId = null;    // 上一次的焦点队伍，用于判断是否需要触发光扫
   let cfg = null;                 // 服务端下发的配置
@@ -402,13 +401,19 @@
    * 打断重播，视觉上就是频闪。这是「高速模式下好像闪现」的直接根因。
    */
   let stepBudget = 1000;      // 当前步的可用时间（毫秒）
+  let transitionBudget = null;
   function setBudget(ms) {
     // 只保底 24ms（一个能被看见的最小过渡），绝不向上抬到超过真实间隔
     stepBudget = Math.max(24, ms || 1000);
     // 格子底色过渡时长同步收紧：写死 180ms 时高速档来不及完成，
     // 背景色看起来是「啪一下跳变」。取预算的一半，保证过渡在本步内走完。
-    const t = Math.max(16, Math.min(220, Math.round(stepBudget * 0.5)));
-    document.documentElement.style.setProperty('--rb-fx-t', t + 'ms');
+    // 极速档的过渡已关闭，不在 select / reveal 之间反复改写继承变量。
+    // 根变量变化会使整张榜单重新计算样式，即使 transition:none 仍有开销。
+    const t = stepBudget < 70 ? 0 : Math.max(16, Math.min(220, Math.round(stepBudget * 0.5)));
+    if (t !== transitionBudget) {
+      document.documentElement.style.setProperty('--rb-fx-t', t + 'ms');
+      transitionBudget = t;
+    }
     // 极高速档（预算 < 70ms）关掉一切渐变过渡：40ms 的渐变人眼根本看不出，
     // 只会在每步边界产生微弱的「跳变感」——直接切换反而干脆、不闪。
     document.body.classList.toggle('fx-off', stepBudget < 70);
@@ -594,11 +599,12 @@
    * 声音是准的，因为定时器时钟本身没错 —— 错的只是画面。
    *
    * 修法：render() 里只**记下目标滚动位置**，
-   * 真正的写入放到 rAF 回调 —— 那时浏览器已经把 layout 算完了，
-   * 写 scrollTop 几乎免费（实测 0.17ms）。
+   * 真正写入放到 rAF 合并执行；注意 rAF 在布局前执行，并不保证布局干净。
+   * 因此还必须缓存目标，跳过相同目标的读取与写入，避免每步强制排版。
    */
   let pendingScroll = null;    // 待写入的目标滚动位置
   let scrollRaf = 0;
+  let lastScrollTarget = null;
 
   function flushScroll() {
     scrollRaf = 0;
@@ -607,9 +613,11 @@
     const want = pendingScroll;
     pendingScroll = null;
     if (!wrap) return;
-    // 读 scrollTop 也可能触发 layout，但此时 layout 已是干净的
-    if (Math.abs(want - wrap.scrollTop) < 0.5) return;
+    // rAF 在布局之前执行，读取 scrollTop 仍可能强制同步排版。
+    // 焦点槽位不变时目标也不变，比较缓存即可，完全不碰布局读取。
+    if (lastScrollTarget !== null && Math.abs(want - lastScrollTarget) < 0.5) return;
     wrap.scrollTop = want;
+    lastScrollTarget = want;
   }
 
   /** 把焦点行滚到视口下方的锚点位置；返回是否需要滚动
@@ -686,6 +694,7 @@
 
   /** 重新测量行高 / 表头高 / 视口高。内容或尺寸变化时才需要。 */
   function measureMetrics() {
+    lastScrollTarget = null;
     const wrap = $('tableWrap');
     const first = rowEls.size ? rowEls.values().next().value : null;
     // 只读布局属性，必须在没有脏 DOM 时读，否则会触发强制重排
@@ -751,23 +760,25 @@
       for (const r of frame.ranks) {
         const tr = rowEls.get(r.teamId);
         if (!tr) continue;
-        tr.classList.remove('medal-gold', 'medal-silver', 'medal-bronze');
-        if (r.medal) tr.classList.add('medal-' + r.medal);
         const m = metaEls.get(r.teamId);
         const prev = oldRanks ? oldRanks.get(r.teamId) : null;
+        if (!prev || prev.medal !== r.medal) {
+          tr.classList.remove('medal-gold', 'medal-silver', 'medal-bronze');
+          if (r.medal) tr.classList.add('medal-' + r.medal);
+        }
 
         // 名次变化：数字弹一下
         if (prev && prev.rank !== r.rank && !full && animate) {
           pulse(m.rank, 'bump');
         }
-        m.rank.textContent = r.rank == null ? '*' : r.rank;
+        if (!prev || prev.rank !== r.rank) m.rank.textContent = r.rank == null ? '*' : r.rank;
 
         // 通过数增加：闪一下金色
         if (prev && prev.solved < r.solved && !full && animate) {
           pulse(m.solved, 'gain');
         }
-        m.solved.textContent = r.solved;
-        m.penalty.textContent = r.penaltyMin;
+        if (!prev || prev.solved !== r.solved) m.solved.textContent = r.solved;
+        if (!prev || prev.penaltyMin !== r.penaltyMin) m.penalty.textContent = r.penaltyMin;
       }
     }
 
@@ -803,7 +814,8 @@
       let start = 0;
       while (start < newOrder.length && newOrder[start] === displayedOrder[start]) start++;
       // 先禁用 transition，避免写入位移时行自己先滑过去
-      if (flip) $('tableWrap').classList.add('flipping');
+      const suppressTransitions = flip && stepBudget >= 70;
+      if (suppressTransitions) $('tableWrap').classList.add('flipping');
 
       // 从后往前定位：把第 i 行插到第 i+1 行之前
       for (let i = newOrder.length - 1; i >= start; i--) {
@@ -835,7 +847,7 @@
         const dur = budgetOf(FLIP_NOMINAL, 0.55);
         for (const m of moved) {
           const tr = rowEls.get(m.id);
-          const dy = (m.oi - m.i) * rowHeight;
+          const dy = (m.oi - m.i) * rowH;
           if (tr.__flipAnim) { try { tr.__flipAnim.cancel(); } catch (e) { /* 忽略 */ } }
           try {
             tr.__flipAnim = tr.animate(
@@ -848,7 +860,7 @@
             requestAnimationFrame(() => { tr.style.transform = ''; });
           }
         }
-        requestAnimationFrame(() => $('tableWrap').classList.remove('flipping'));
+        if (suppressTransitions) requestAnimationFrame(() => $('tableWrap').classList.remove('flipping'));
       }
     }
 
@@ -1196,6 +1208,9 @@
   function lockWheel() {
     const wrap = $('tableWrap');
     if (!wrap) return;
+    // 手动拖动滚动条后，下一步重新锚定；普通播放沿用缓存。
+    wrap.addEventListener('pointerdown', () => { lastScrollTarget = null; });
+    wrap.addEventListener('pointerup', () => { lastScrollTarget = null; });
     wrap.addEventListener('wheel', (e) => {
       // Ctrl + 滚轮 = 浏览器缩放，放行
       if (e.ctrlKey) return;
