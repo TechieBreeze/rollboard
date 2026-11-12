@@ -15,7 +15,7 @@ const CHROME_CANDIDATES = [
   'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
   'C:/Program Files/Microsoft/Edge/Application/msedge.exe'
 ];
-const CHROME = CHROME_CANDIDATES.find((p) => fs.existsSync(p));
+const CHROME = process.env.CHROME_PATH || CHROME_CANDIDATES.find((p) => fs.existsSync(p));
 const BASE = process.env.ROLLBOARD_BASE || 'http://127.0.0.1:5173';
 const PORT = Number(process.env.CDP_PORT || 9337);
 const OUT = path.join(__dirname, '..', 'data', 'ui-shots');
@@ -33,6 +33,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // 服务是否在跑
   try { await get(BASE + '/api/health'); }
   catch (e) { console.error('SKIP: 服务未启动（' + BASE + '），请先 npm start'); process.exit(0); }
+  if (!process.env.ROLLBOARD_ADMIN_TOKEN) throw new Error('UI 管理回归需要 ROLLBOARD_ADMIN_TOKEN（与服务端相同的管理口令）');
+  const login = await fetch(BASE + '/api/session', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: process.env.ROLLBOARD_ADMIN_TOKEN })
+  });
+  if (!login.ok) throw new Error('UI 回归管理登录失败');
 
   const chrome = spawn(CHROME, [`--remote-debugging-port=${PORT}`, `--user-data-dir=${PROFILE}`,
     '--headless=new', '--disable-gpu', '--no-first-run', '--hide-scrollbars', '--window-size=1600,900', 'about:blank'], { stdio: 'ignore' });
@@ -72,7 +78,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await sleep(320);
   };
 
-  const R = { theme: {}, live: {}, setup: {}, fx: {} };
+  // Exercise the same fragment-based login link used by the operator.
+  await goto(BASE + '/#admin=' + encodeURIComponent(process.env.ROLLBOARD_ADMIN_TOKEN));
+  const loggedIn = await evalJs(`(async()=>{const r=await fetch('/api/session');return (await r.json()).data.authenticated;})()`);
+  if (!loggedIn || await evalJs(`location.hash.includes('admin=')`)) throw new Error('管理链接登录或口令清理失败');
+  const R = { theme: {}, live: {}, setup: {}, fx: {}, login: { authenticated: loggedIn, tokenRemoved: true } };
 
   /* ---------- 主题 ---------- */
   for (const theme of ['dark', 'light']) {
@@ -617,16 +627,19 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await key('KeyK', { key: 'k', vk: 75 });
   await sleep(300);
   R.setup.newBinding = await evalJs(`document.querySelector('.key-input[data-action="pure"]').textContent`);
+  await evalJs(`document.getElementById('cDuration').value='300'; document.getElementById('cFreeze').value='60';`);
   await evalJs(`document.getElementById('saveCfgBtn').click();`);
   await sleep(700);
   R.setup.savedKey = await evalJs(`(async()=>{const r=await fetch('/api/config');const j=await r.json();return j.data.keys.pure;})()`);
+  R.setup.savedDuration = await evalJs(`(async()=>{const r=await fetch('/api/config');const j=await r.json();return j.data.fetch.durationMinutes;})()`);
+  if (R.setup.savedDuration !== 300) throw new Error('HOJ 实际时长字段未正确保存');
   await evalJs(`(async()=>{await fetch('/api/config',{method:'DELETE'});})()`);
   await sleep(400);
 
   /* ---------- 凭据不落盘 ---------- */
   await evalJs(`(async()=>{await fetch('/api/config',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({auth:{username:'jury',password:'regression-secret-888'}})});})()`);
   await sleep(500);
-  const diskCfg = fs.readFileSync(path.join(__dirname, '..', 'data', 'config.json'), 'utf8');
+  const diskCfg = fs.readFileSync(path.join(process.env.ROLLBOARD_DATA || path.join(__dirname, '..', 'data'), 'config.json'), 'utf8');
   R.security = {
     diskHasSecret: diskCfg.includes('regression-secret-888'),
     diskHasPasswordField: /"password"/.test(diskCfg),

@@ -31,7 +31,9 @@ npm start          # 零第三方依赖，不需要 npm install
 # 滚榜大屏   http://127.0.0.1:5173/board.html
 ```
 
-需要 Node ≥ 18（服务端用到内置 `fetch`；UI 回归脚本用 Node 22 的全局 `WebSocket` 驱动 Chrome）。首次打开工作台会自动生成一场演示比赛，点「打开滚榜大屏」即可立即体验。
+启动后终端会显示带 `#admin=...` 的管理链接与管理口令。使用该链接进入工作台即可登录；直接打开工作台时也可输入管理口令。登录后同一浏览器可打开配置中心，会话最长 12 小时，重启服务后失效。可通过环境变量 `ROLLBOARD_ADMIN_TOKEN` 指定固定口令（至少 16 个字符）；不设置则每次启动随机生成。只把 `/board.html` 链接分享给观众，观看无需登录。
+
+需要 Node ≥ 18（服务端用到内置 `fetch`；UI 回归脚本用 Node 22 的全局 `WebSocket` 驱动 Chrome）。首次登录工作台会自动生成一场演示比赛，点「打开滚榜大屏」即可立即体验。
 
 `data/` 目录、默认配置和演示数据都在首次运行时自动创建，**不入库** —— 每台机器各自维护自己的数据源与比赛文件。
 
@@ -81,7 +83,7 @@ GET /api/v4/contests/{cid}/judgement-types  判定类型
 GET /api/v4/contests/{cid}/scoreboard       官方榜单（交叉校验）
 ```
 
-预处理逻辑：用 `contest_time` / `time` 把提交换算成相对开赛秒数，把「提交时间在封榜前且判定时点也在封榜前」的提交重放成 `frozen`；封榜后的提交、以及封榜时尚未判定的提交进入 `submissions` 待揭示列表。最后用 jury 榜单核对重建出的**最终通过题数与总罚时**，结果写进 `meta.validation`，在工作台可见「一致 / 有差异」。
+预处理逻辑：用 `contest_time` / `time` 把提交换算成相对开赛秒数，按交题顺序将封榜前提交的最终判定重放成 `frozen`；判题完成时间不参与封榜划分，封榜前交的题即使封榜后才判完，也计入初始榜。封榜后的提交、以及拉取时仍无判定结果的提交进入 `submissions` 待揭示列表。最后用 jury 榜单核对重建出的**最终通过题数与总罚时**，结果写进 `meta.validation`，在工作台可见「一致 / 有差异」。
 
 > 拉取动作本身在**工作台 `/`** 的「快速拉取」区发起：选数据源 → 填比赛 ID / 账号密码 → 点拉取。配置中心只负责**存**这些选项（数据源、账号、奖牌线、封榜默认值），工作台负责**用**它们。
 
@@ -97,6 +99,7 @@ GET /api/get-contest-scroll-board-submission?cid={cid}&removeStar=false
 - `info` 提供 `startTime`、`sealRankTime`（封榜时间）、`balloonColor`（题号与颜色）、`rankShowName`（榜单显示名）、`starUserList`（打星用户名）。
 - `submission` 提供 `submitId / uid / displayId / status / submitTime` 及冗余的队伍信息；`status` 按官方 `scrollboard.js` 的 `statusMap` 转换（`0→AC`、`-1→WA`、`-2→CE`、`5/6/7/9→PENDING` 等）。
 - HOJ 滚榜接口**不返回比赛结束时间**，因此 `durationSec` 由最晚提交时间向上取整推断，仅用于展示，不影响滚榜。
+- HOJ 手动填写「结束前 N 分钟封榜」时，必须同时在配置中心填写「实际比赛时长」（例如 300 分钟），防止把推断时长用于封榜划分；不覆盖时仍采用 HOJ 自带封榜时刻。
 - HOJ 的比赛列表接口各版本差异较大，若「列表」为空，直接手填 CID 并用「测试连接」验证即可。
 
 ## 3. 导入已有 JSON / 演示数据
@@ -334,7 +337,7 @@ GET /api/get-contest-scroll-board-submission?cid={cid}&removeStar=false
 ```
 
 - `frozen[team][problem].attempts`：封榜前、AC 之前的计罚错误提交数。
-- `submissions`：**只放待揭示的提交**（封榜后提交 + 封榜时尚未判定的提交），按时间排序；`penalty=false` 的结果（CE/PE/SE/PENDING）不计 20 分钟罚时。
+- `submissions`：**只放待揭示的提交**（封榜后提交 + 拉取时仍无判定结果的提交），按交题时间排序；`penalty=false` 的结果（CE/PE/SE/PENDING）不计 20 分钟罚时。旧文件若将已公开 AC 之前的罚时失败放在此列表，引擎会在加载时补齐这些罚时，避免滚榜过程中名次向下倒退；更早的 AC 或同秒先后顺序不能仅靠聚合成绩可靠恢复，应重新拉取原始数据。
 - 文件自包含，不依赖 OJ、不依赖数据库，可随意复制归档。
 
 ---
@@ -345,12 +348,14 @@ GET /api/get-contest-scroll-board-submission?cid={cid}&removeStar=false
 - **密码从不落盘**：`config.json` 里不含任何密码字段，服务端在写盘前会主动剔除。密码只存在浏览器 `sessionStorage`（当前标签页会话），关掉标签页即失效；提交请求时由前端直接传给服务端，用完即走。
 - `sources.json` 只保存用户名与地址。
 - 服务默认只监听 `127.0.0.1`；对外展示时再显式设置 `HOST=0.0.0.0`。
+- 管理 API（包括配置、数据源、原始快照、拉取与所有写入）要求管理口令或已登录会话；大屏使用独立的只读播放配置接口。浏览器会话通过 HttpOnly / SameSite=Strict Cookie 保存，不将管理口令写入 localStorage 或配置文件。命令行可使用 `Authorization: Bearer <管理口令>`。
+- 跨来源重定向会清除自定义请求头和 Basic 凭据，拒绝 HTTPS 降级及跨来源转发请求体；同源重定向保持认证。
 - 自签名 HTTPS 可在拉取表单勾选「允许自签名 HTTPS」。
 
 ## 测试与二次开发
 
 ```bash
-npm test          # 18 项：焦点行规则、原子步骤、预计算帧、一血/获奖展示、封榜重建、终榜一致性、两种适配器、格式识别、配置深合并、凭据不落盘
+npm test          # 引擎、适配器、导入时间单位、XSS、封榜边界、重定向凭据、管理权限及会话回归
 npm run test:ui   # UI 全量回归（需先 npm start + 本机装有 Chrome）：主题、纯净模式、快捷键、配置页、动效、凭据检查
 npm run test:fx        # 动效连续性专项：逐档位统计动画重播次数（应为 0）
 npm run test:frames    # 播放流畅度专项：统计真实播放时的帧间隔与掉帧率
@@ -358,6 +363,8 @@ npm run mock      # 启动模拟 OJ（http://127.0.0.1:8791）
 ```
 
 `npm run test:ui` 用 Chrome DevTools Protocol 驱动真实浏览器跑一遍关键交互，把结果打印成 JSON 并把截图写到 `data/ui-shots/`；没装 Chrome 或服务没启动时会自动跳过而不是报错。
+
+UI 管理回归需要在测试进程设置与服务端相同的 `ROLLBOARD_ADMIN_TOKEN`；使用独立数据目录时，服务与测试同时设置同一个 `ROLLBOARD_DATA`，避免测试修改日常比赛配置。
 
 其中三项是**「跳步」专项防回归断言**，任何一条被打破都会让测试直接失败：
 

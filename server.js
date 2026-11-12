@@ -11,6 +11,8 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+const { createAccess } = require('./lib/access.js');
 
 const store = require('./lib/store.js');
 const S = require('./lib/schema.js');
@@ -22,6 +24,9 @@ const PUBLIC = path.join(ROOT, 'public');
 const PORT = Number(process.env.PORT || 5173);
 const HOST = process.env.HOST || '127.0.0.1';
 const MAX_BODY = 32 * 1024 * 1024;
+const ADMIN_TOKEN = process.env.ROLLBOARD_ADMIN_TOKEN || crypto.randomBytes(32).toString('hex');
+if (ADMIN_TOKEN.length < 16) throw new Error('ROLLBOARD_ADMIN_TOKEN 至少需要 16 个字符');
+const access = createAccess(ADMIN_TOKEN);
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -110,14 +115,37 @@ function serveStatic(res, urlPath) {
 async function handleApi(req, res, url) {
   const p = url.pathname;
   const method = req.method.toUpperCase();
+  if (!['GET', 'HEAD'].includes(method) && !access.sameOrigin(req)) {
+    return send(res, 403, { ok: false, error: '拒绝跨站管理请求' });
+  }
+  if (!access.publicRead(req, p) && !(p === '/api/session' && method === 'POST') && !access.authenticated(req)) {
+    return send(res, 401, { ok: false, error: '请使用服务启动时显示的管理口令登录' });
+  }
+  if (['POST', 'PUT'].includes(method) && !/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] || '')) {
+    return send(res, 415, { ok: false, error: '请求必须使用 application/json' });
+  }
   const body = (method === 'POST' || method === 'PUT') ? await readBody(req) : {};
   const seg = p.split('/').filter(Boolean); // ['api', ...]
 
+  if (p === '/api/session' && method === 'GET') return ok(res, { authenticated: access.authenticated(req) });
+  if (p === '/api/session' && method === 'POST') {
+    const cookie = access.login(req, body.token);
+    if (!cookie) return send(res, 401, { ok: false, error: '管理口令不正确' });
+    return send(res, 200, { ok: true, data: { authenticated: true } }, { 'Set-Cookie': cookie });
+  }
+  if (p === '/api/session' && method === 'DELETE') {
+    return send(res, 200, { ok: true, data: {} }, { 'Set-Cookie': access.logout(req) });
+  }
+
   if (p === '/api/health' && method === 'GET') {
-    return ok(res, { name: 'RollBoard Studio', version: '1.0.0', node: process.version, dataDir: store.DATA });
+    return ok(res, { name: 'RollBoard Studio', version: '1.0.0' });
   }
 
   if (p === '/api/types' && method === 'GET') return ok(res, Adapters.listTypes());
+  if (p === '/api/board-config' && method === 'GET') {
+    const cfg = store.getConfig();
+    return ok(res, { board: cfg.board, keys: cfg.keys });
+  }
 
   /* 全局配置 */
   if (p === '/api/config' && method === 'GET') return ok(res, store.getConfig());
@@ -214,7 +242,9 @@ async function handleApi(req, res, url) {
 }
 
 const server = http.createServer((req, res) => {
-  const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  let url;
+  try { url = new URL(req.url, `http://${req.headers.host || 'localhost'}`); }
+  catch (e) { return send(res, 400, 'Bad request'); }
   if (url.pathname.startsWith('/api/')) {
     handleApi(req, res, url).catch((e) => fail(res, e));
     return;
@@ -228,8 +258,11 @@ server.listen(PORT, HOST, () => {
   console.log('  ╔══════════════════════════════════════════════════════╗');
   console.log('  ║            RollBoard Studio  ·  滚榜工作台            ║');
   console.log('  ╚══════════════════════════════════════════════════════╝');
-  console.log(`  管理台   http://${HOST}:${PORT}/`);
-  console.log(`  滚榜大屏 http://${HOST}:${PORT}/board.html`);
+  const port = server.address().port;
+  const host = HOST === '0.0.0.0' || HOST === '::' ? '127.0.0.1' : (HOST.includes(':') ? `[${HOST}]` : HOST);
+  console.log(`  管理台   http://${host}:${port}/#admin=${encodeURIComponent(ADMIN_TOKEN)}`);
+  console.log(`  管理口令 ${ADMIN_TOKEN}`);
+  console.log(`  滚榜大屏 http://${host}:${port}/board.html`);
   console.log(`  数据目录 ${store.DATA}`);
   console.log('');
 });

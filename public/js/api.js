@@ -22,7 +22,18 @@
     get: (p) => request(p),
     post: (p, body) => request(p, { method: 'POST', body }),
     put: (p, body) => request(p, { method: 'PUT', body }),
-    del: (p) => request(p, { method: 'DELETE' })
+    del: (p) => request(p, { method: 'DELETE' }),
+    ensureAdmin: async () => {
+      const fragment = new URLSearchParams(location.hash.slice(1));
+      const fromLink = fragment.get('admin');
+      if (fromLink !== null) history.replaceState(null, '', location.pathname + location.search);
+      const session = await request('/api/session');
+      if (session.authenticated) return true;
+      const token = fromLink || window.prompt('请输入服务启动时显示的管理口令（大屏观看无需登录）：');
+      if (!token) return false;
+      await request('/api/session', { method: 'POST', body: { token } });
+      return true;
+    }
   };
   window.escapeHTML = function (s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
@@ -32,7 +43,7 @@
   window.fmtTime = function (iso) {
     if (!iso) return '—';
     const d = new Date(iso);
-    if (isNaN(d.getTime())) return iso;
+    if (isNaN(d.getTime())) return '—';
     return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
   };
 })();

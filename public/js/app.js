@@ -53,6 +53,7 @@
     };
     const freeze = f.freezeMinutesBeforeEnd;
     if (freeze !== '' && freeze != null) o.freezeMinutesBeforeEnd = Number(freeze);
+    if (f.durationMinutes !== '' && f.durationMinutes != null) o.durationMinutes = Number(f.durationMinutes);
     if (f.fileId) o.id = f.fileId;
     if ($('fTitle').value.trim()) o.title = $('fTitle').value.trim();
     return o;
@@ -77,7 +78,7 @@
         <div><b>${s.problemCount}</b><span>题目</span></div>
         <div><b>${s.pendingSubmissions}</b><span>待揭示提交</span></div>
         <div><b>${s.pendingCells}</b><span>待揭示格子</span></div>
-        <div><b>${esc(valText)}</b><span>交叉校验（${v.checked || 0} 队）</span></div>
+        <div><b>${esc(valText)}</b><span>交叉校验（${esc(v.checked || 0)} 队）</span></div>
       </div>
       <div style="font-size:12px;color:var(--muted)">文件：<code>${esc(r.file.id)}.rboard.json</code> · 封榜于开赛后 ${Math.round(s.freezeSec / 60)} 分钟</div>
       ${warn.length ? '<ul>' + warn.map((w) => '<li>' + esc(w) + '</li>').join('') + '</ul>' : ''}
@@ -159,7 +160,7 @@
         <td>${f.summary.teamCount} 队 / ${f.summary.problemCount} 题</td>
         <td><b>${f.summary.pendingSubmissions}</b> 提交<div class="t-sub">${f.summary.pendingCells} 个格子</div></td>
         <td><span class="${vCls}" title="${esc(v.note || '')}">${vTxt}</span></td>
-        <td class="t-sub">${window.fmtTime(f.fetchedAt)}</td>
+        <td class="t-sub">${esc(window.fmtTime(f.fetchedAt))}</td>
         <td class="right"><div class="row-actions">
           <a class="btn btn-primary" style="padding:6px 11px" href="/board.html?id=${encodeURIComponent(f.id)}" target="_blank">滚榜</a>
           <a class="btn btn-ghost" style="padding:6px 10px" href="/api/files/${encodeURIComponent(f.id)}/download">下载</a>
@@ -238,6 +239,9 @@
 
   async function init() {
     bind();
+    try {
+      if (!await API.ensureAdmin()) { setStatus('未登录管理台，可直接打开滚榜大屏观看', false); return; }
+    } catch (e) { setStatus('管理登录失败：' + e.message, false); return; }
     try {
       const h = await API.get('/api/health');
       setStatus('本地服务已连接 · ' + h.name, true);

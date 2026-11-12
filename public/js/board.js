@@ -1275,7 +1275,7 @@
   /** 应用服务端配置（大屏只关心 board 段） */
   async function loadConfig() {
     try {
-      cfg = await API.get('/api/config');
+      cfg = await API.get('/api/board-config');
     } catch (e) { cfg = null; }
     const b = (cfg && cfg.board) || {};
     if (b.speed != null && SPEEDS.includes(Number(b.speed))) {

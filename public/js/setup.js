@@ -176,6 +176,7 @@
     $('cUser').value = (cfg.auth && cfg.auth.username) || '';
     $('cPass').value = sessionStorage.getItem(AUTH_KEY) || '';
     $('cFreeze').value = f.freezeMinutesBeforeEnd === '' || f.freezeMinutesBeforeEnd == null ? '' : f.freezeMinutesBeforeEnd;
+    $('cDuration').value = f.durationMinutes == null ? '' : f.durationMinutes;
     $('cFileId').value = f.fileId || '';
     $('cTitle').value = f.title || '';
     $('cGold').value = m.gold != null ? m.gold : 4;
@@ -200,6 +201,7 @@
       auth: { username: $('cUser').value.trim(), password: $('cPass').value },
       fetch: {
         freezeMinutesBeforeEnd: freeze === '' ? '' : Number(freeze),
+        durationMinutes: $('cDuration').value === '' ? '' : Number($('cDuration').value),
         title: $('cTitle').value.trim(),
         fileId: $('cFileId').value.trim(),
         includeHidden: $('cHidden').checked,
@@ -288,6 +290,7 @@
   async function init() {
     bind();
     try {
+      if (!await API.ensureAdmin()) { toast('请使用服务启动时的管理链接打开配置中心', true); return; }
       cfg = await API.get('/api/config');
     } catch (e) {
       toast('配置读取失败：' + e.message, true);
