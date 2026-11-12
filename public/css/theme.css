@@ -1,0 +1,359 @@
+/* ============================================================
+   RollBoard Studio · 主题令牌
+   ------------------------------------------------------------
+   两套完整主题，随 <html data-theme="dark|light"> 切换：
+     dark  —— 默认，ICPC Resolver 风格深色大屏
+     light —— 浅色会场 / 投影仪偏亮环境
+   令牌分两组，避免两个页面互相污染：
+     --rb-*  滚榜大屏
+     --ui-*  管理台工作台
+   深色写在 :root（JS 失效也能正常显示），浅色用更高特异性覆盖。
+   ============================================================ */
+
+:root{
+  color-scheme:dark;
+
+  --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",Arial,sans-serif;
+  --font-mono:ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;
+  --radius:14px;
+
+  /* ================= 滚榜大屏 · 深色 ================= */
+  --rb-bg:#05070b;
+  --rb-stripe-a:#090c12;
+  --rb-stripe-b:#0f131b;
+  --rb-head:#141922;
+  --rb-head-line:#232b38;
+  --rb-line:#1c222d;
+  --rb-row-line:rgba(28,34,45,.55);
+  --rb-text:#e8edf6;
+  --rb-muted:#8a94a6;
+  --rb-faint:#727e93;
+  --rb-gold:#f2c14e;
+  --rb-gold-fg:#231a05;
+  --rb-gold-line:rgba(242,193,78,.4);
+  --rb-silver:#b9c9df;
+  --rb-bronze:#cf8b57;
+  --rb-blue:#5b8dff;
+  --rb-blood-fg:#8fb2ff;
+  --rb-blood-fg-strong:#9cc0ff;
+
+  --rb-cell-empty:#252a33;
+  --rb-cell-empty-fg:#464e5c;
+  --rb-cell-pending:#d3ba2c;
+  --rb-cell-pending-fg:#1c1604;
+  --rb-cell-ac:#2c9c58;
+  --rb-cell-ac-fg:#eafff1;
+  --rb-cell-wa:#ab3342;
+  --rb-cell-wa-fg:#ffe9ec;
+
+  /* 焦点行：反色（亮底深字） */
+  --rb-focus-bg:#e7edf6;
+  --rb-focus-fg:#0b1018;
+  --rb-focus-rank:#101820;
+  --rb-focus-team:#0b1018;
+  --rb-focus-org:#5b6675;
+  --rb-focus-num:#131b26;
+  --rb-focus-cell-bg:#c6cfdc;
+  --rb-focus-cell-fg:#7d8898;
+  --rb-focus-outline:#0b1018;
+  --rb-focus-glow:rgba(11,16,24,.8);
+  --rb-focus-shadow:inset 5px 0 0 var(--rb-gold);
+  --rb-focus-solved:#0f6b3d;
+  --rb-focus-arrow:#b8860b;
+
+  --rb-select-ring:#ffffff;
+  --rb-select-glow:rgba(255,255,255,.95);
+
+  /* 目标格描边（待揭晓 / 揭晓瞬间）。
+     必须在任何底色上都清晰可见，且**不随焦点行变化** ——
+     否则揭晓导致焦点让位时，描边会当场跳色，观众视线锚点被拽走，
+     看着就像「闪了一下」。外圈亮色 + 内圈深色 halo 双层，任何底色都压得住。 */
+  --rb-target-ring:#ffffff;
+  --rb-target-halo:rgba(8,11,17,.85);
+  --rb-target-glow:rgba(255,255,255,.9);
+
+  --rb-team-name:#f3f6fb;
+  --rb-rank-num:#96a2b5;
+  --rb-solved:#63d7a0;
+  --rb-penalty:#9aa6b8;
+  --rb-ac-text:#5ce0a0;
+  --rb-wa-text:#ff8a99;
+  --rb-pop-fg:#ffffff;
+
+  --rb-prob-col:#8b97a9;
+  --rb-prob-border:#2b3442;
+  --rb-badge-ring:rgba(255,255,255,.08);
+
+  --rb-bar-bg:#080b11;
+  --rb-bar-grad:linear-gradient(90deg,rgba(91,141,255,.10),rgba(8,11,17,.4) 55%,rgba(46,156,88,.06));
+  --rb-bar-grad-ceremony:linear-gradient(90deg,rgba(242,193,78,.20),rgba(8,11,17,.4) 60%,rgba(242,193,78,.09));
+  --rb-track:#1b222e;
+  --rb-progress-grad:linear-gradient(90deg,#4d7bff,#38c07a);
+
+  --rb-ctl-bg:#151b25;
+  --rb-ctl-line:#232d3d;
+  --rb-ctl-fg:#c3cddd;
+  --rb-ctl-hover:#1d2735;
+  --rb-ctl-hover-line:#3a4b64;
+  --rb-ctl-hover-fg:#ffffff;
+  --rb-primary-grad:linear-gradient(135deg,#3568f5,#5b47e8);
+
+  --rb-input-bg:#1b2331;
+  --rb-input-line:#2b3648;
+  --rb-wait-bg:#1a2640;
+  --rb-wait-fg:#a9c6ff;
+
+  --rb-tbl-bg:#070a0f;
+  --rb-scroll:#2a3442;
+  --rb-empty-icon:#2b3648;
+
+  --rb-panel-grad:linear-gradient(160deg,#121b2a,#070b12);
+  --rb-panel-solid:#0e1520;
+  --rb-panel-line:#253247;
+  --rb-panel-text:#d4dce9;
+  --rb-panel-muted:#9aa8bd;
+  --rb-panel-dim:#6e7d94;
+  --rb-panel-faint:#4d586b;
+  --rb-emblem-fg:#0a0e15;
+
+  --rb-splash-grad:radial-gradient(900px 600px at 50% 42%,#101827 0%,#05070b 72%);
+  --rb-splash-glow:rgba(91,141,255,.28);
+  --rb-splash-hint:#c8d2e2;
+  --rb-kbd-bg:#1c2534;
+  --rb-kbd-line:#33415a;
+  --rb-kbd-fg:#ffffff;
+
+  --rb-award-grad:radial-gradient(1000px 700px at 50% 40%,rgba(242,193,78,.20),transparent 70%);
+  --rb-award-grad-silver:radial-gradient(1000px 700px at 50% 40%,rgba(185,201,223,.16),transparent 70%);
+  --rb-award-grad-bronze:radial-gradient(1000px 700px at 50% 40%,rgba(207,139,87,.18),transparent 70%);
+  --rb-award-grad-blood:radial-gradient(1000px 700px at 50% 40%,rgba(91,141,255,.20),transparent 70%);
+  --rb-overlay:rgba(3,5,9,.94);
+  --rb-hud-bg:rgba(18,24,38,.94);
+  --rb-hud-fg:#e8edf6;
+  --rb-hud-line:rgba(255,255,255,.12);
+  --rb-drawer-bg:#0e1420;
+  --rb-surface-2:#171e2e;
+  --rb-accent-focus-bg:#1e3a8a;
+  --rb-accent-focus-fg:#ffffff;
+
+  /* ================= 管理台 · 深色 ================= */
+  --ui-bg:#0b0f18;
+  --ui-surface:#121826;
+  --ui-surface-2:#171e2e;
+  --ui-border:#222c3e;
+  --ui-border-strong:#2e3a50;
+  --ui-text:#e6ecf7;
+  --ui-muted:#95a3ba;
+  --ui-faint:#6b7a94;
+  --ui-field-label:#b9c6da;
+
+  --ui-primary:#5b8dff;
+  --ui-primary-soft:rgba(91,141,255,.14);
+  --ui-primary-dark:#3b6cf0;
+  --ui-accent:#2fc79a;
+  --ui-accent-soft:rgba(47,199,154,.14);
+  --ui-warn:#f0a63a;
+  --ui-warn-soft:rgba(240,166,58,.14);
+  --ui-danger:#f2637a;
+  --ui-danger-soft:rgba(242,99,122,.14);
+  --ui-good-line:rgba(47,199,154,.4);
+  --ui-bad-line:rgba(242,99,122,.4);
+
+  --ui-shadow:0 1px 2px rgba(0,0,0,.30), 0 8px 26px rgba(0,0,0,.36);
+  --ui-code-bg:#161d2c;
+  --ui-code-fg:#9fb0cd;
+  --ui-input-bg:#0f1522;
+  --ui-table-hover:#182034;
+  --ui-modal-bg:#141b2a;
+  --ui-modal-mask:rgba(4,7,13,.72);
+  --ui-toast-bg:#1b2536;
+  --ui-pre-bg:#0b1120;
+  --ui-pre-fg:#c3d3ee;
+  --ui-tag-demo-bg:rgba(124,58,237,.20);
+  --ui-tag-demo-fg:#c4b5fd;
+  --ui-tag-generic-bg:#1b2434;
+  --ui-tag-generic-fg:#94a3b8;
+  --ui-pill-ok-bg:rgba(11,143,99,.18);
+  --ui-pill-ok-fg:#34d399;
+  --ui-pill-none-bg:#1b2434;
+  --ui-pill-none-fg:#8fa0b8;
+  --ui-kv-bg:rgba(255,255,255,.045);
+  --ui-kv-line:rgba(255,255,255,.07);
+  --ui-warn-list:#d8b98a;
+
+  --ui-sidebar-bg:#0a0f1a;
+  --ui-sidebar-text:#dce6f8;
+  --ui-sidebar-muted:#9fb2d0;
+  --ui-sidebar-faint:#63799f;
+  --ui-sidebar-line:rgba(255,255,255,.08);
+}
+
+/* =================== 滚榜大屏 · 浅色 =================== */
+html[data-theme="light"]{
+  color-scheme:light;
+
+  --rb-bg:#eef2f8;
+  --rb-stripe-a:#ffffff;
+  --rb-stripe-b:#f4f7fc;
+  --rb-head:#e6ecf6;
+  --rb-head-line:#d3dcec;
+  --rb-line:#d5deec;
+  --rb-row-line:rgba(21,34,56,.10);
+  --rb-text:#14203a;
+  --rb-muted:#55647f;
+  --rb-faint:#6d7c96;
+  --rb-gold:#b8860b;
+  --rb-gold-fg:#fffdf5;
+  --rb-gold-line:rgba(184,134,11,.42);
+  --rb-silver:#6f7d94;
+  --rb-bronze:#a3673c;
+  --rb-blue:#2f5bff;
+  --rb-blood-fg:#3b6cf0;
+  --rb-blood-fg-strong:#2b50c8;
+
+  --rb-cell-empty:#e3e9f3;
+  --rb-cell-empty-fg:#98a4b8;
+  --rb-cell-pending:#f2c20f;
+  --rb-cell-pending-fg:#3b2f00;
+  --rb-cell-ac:#1f9d55;
+  --rb-cell-ac-fg:#f0fff6;
+  --rb-cell-wa:#cf3b4b;
+  --rb-cell-wa-fg:#ffeeef;
+
+  /* 焦点行：浅色主题下改为深底浅字，同样保持反色语义 */
+  --rb-focus-bg:#16203a;
+  --rb-focus-fg:#eef3fb;
+  --rb-focus-rank:#e8eef8;
+  --rb-focus-team:#ffffff;
+  --rb-focus-org:#a8b6cf;
+  --rb-focus-num:#dbe4f2;  --rb-focus-cell-bg:#33405a;
+  --rb-focus-cell-fg:#8fa0bd;
+  --rb-focus-outline:#ffffff;
+  --rb-focus-glow:rgba(255,255,255,.75);
+  --rb-focus-shadow:inset 5px 0 0 var(--rb-gold);
+  --rb-focus-solved:#7ee2b0;
+  --rb-focus-arrow:#f2c14e;
+
+  --rb-select-ring:#16203a;
+  --rb-select-glow:rgba(22,32,58,.55);
+
+  /* 目标格描边（浅色主题）：深色外圈 + 浅色 halo，同样双层不跳色。 */
+  --rb-target-ring:#16203a;
+  --rb-target-halo:rgba(255,255,255,.9);
+  --rb-target-glow:rgba(22,32,58,.5);
+
+  --rb-team-name:#14203a;
+  --rb-rank-num:#5f6e88;
+  --rb-solved:#159a56;
+  --rb-penalty:#5f6e88;
+  --rb-ac-text:#159a56;
+  --rb-wa-text:#d03a4a;
+  --rb-pop-fg:#14203a;
+
+  --rb-prob-col:#46556f;
+  --rb-prob-border:#c9d4e6;
+  --rb-badge-ring:rgba(255,255,255,.55);
+
+  --rb-bar-bg:#ffffff;
+  --rb-bar-grad:linear-gradient(90deg,rgba(47,91,255,.08),rgba(255,255,255,.6) 55%,rgba(31,157,85,.07));
+  --rb-bar-grad-ceremony:linear-gradient(90deg,rgba(184,134,11,.16),rgba(255,255,255,.6) 60%,rgba(184,134,11,.08));
+  --rb-track:#dde4f0;
+  --rb-progress-grad:linear-gradient(90deg,#2f5bff,#1f9d55);
+
+  --rb-ctl-bg:#ffffff;
+  --rb-ctl-line:#d5deec;
+  --rb-ctl-fg:#35435e;
+  --rb-ctl-hover:#f1f5fb;
+  --rb-ctl-hover-line:#b9c7de;
+  --rb-ctl-hover-fg:#14203a;
+  --rb-primary-grad:linear-gradient(135deg,#3568f5,#5b47e8);
+
+  --rb-input-bg:#ffffff;
+  --rb-input-line:#cfd9e8;
+  --rb-wait-bg:#e5edff;
+  --rb-wait-fg:#2b50c8;
+
+  --rb-tbl-bg:#ffffff;
+  --rb-scroll:#c2cede;
+  --rb-empty-icon:#cbd5e5;
+
+  --rb-panel-grad:linear-gradient(160deg,#ffffff,#f4f7fc);
+  --rb-panel-solid:#f6f9fd;
+  --rb-panel-line:#dbe3f0;
+  --rb-panel-text:#22304a;
+  --rb-panel-muted:#55647f;
+  --rb-panel-dim:#65738c;
+  --rb-panel-faint:#7b89a1;
+  --rb-emblem-fg:#fffdf5;
+
+  --rb-splash-grad:radial-gradient(900px 600px at 50% 42%,#ffffff 0%,#e4ebf7 72%);
+  --rb-splash-glow:rgba(47,91,255,.20);
+  --rb-splash-hint:#3a4a66;
+  --rb-kbd-bg:#ffffff;
+  --rb-kbd-line:#c3cfe2;
+  --rb-kbd-fg:#22304a;
+
+  --rb-award-grad:radial-gradient(1000px 700px at 50% 40%,rgba(184,134,11,.22),transparent 70%);
+  --rb-award-grad-silver:radial-gradient(1000px 700px at 50% 40%,rgba(111,125,148,.20),transparent 70%);
+  --rb-award-grad-bronze:radial-gradient(1000px 700px at 50% 40%,rgba(163,103,60,.20),transparent 70%);
+  --rb-award-grad-blood:radial-gradient(1000px 700px at 50% 40%,rgba(47,91,255,.20),transparent 70%);
+  --rb-overlay:rgba(226,233,245,.92);
+  --rb-hud-bg:rgba(255,255,255,.96);
+  --rb-hud-fg:#22304a;
+  --rb-hud-line:rgba(21,34,56,.14);
+  --rb-drawer-bg:#ffffff;
+  --rb-surface-2:#f1f5fb;
+  --rb-accent-focus-bg:#2f5bff;
+  --rb-accent-focus-fg:#ffffff;
+
+  /* ================= 管理台 · 浅色 ================= */
+  --ui-bg:#f4f6fb;
+  --ui-surface:#ffffff;
+  --ui-surface-2:#f8fafc;
+  --ui-border:#e2e8f2;
+  --ui-border-strong:#cdd7e8;
+  --ui-text:#152238;
+  --ui-muted:#6b7a94;
+  --ui-faint:#9aa8bd;
+  --ui-field-label:#3a4b66;
+
+  --ui-primary:#2f5bff;
+  --ui-primary-soft:#eef2ff;
+  --ui-primary-dark:#1e40d8;
+  --ui-accent:#0f9f7a;
+  --ui-accent-soft:#e6f8f2;
+  --ui-warn:#d97706;
+  --ui-warn-soft:#fff6e6;
+  --ui-danger:#dc3f50;
+  --ui-danger-soft:#fff0f2;
+  --ui-good-line:#b7e8d8;
+  --ui-bad-line:#f6c9d0;
+
+  --ui-shadow:0 1px 2px rgba(20,35,70,.04), 0 8px 26px rgba(20,35,70,.06);
+  --ui-code-bg:#eef2fa;
+  --ui-code-fg:#3c4d6b;
+  --ui-input-bg:#ffffff;
+  --ui-table-hover:#fbfcff;
+  --ui-modal-bg:#ffffff;
+  --ui-modal-mask:rgba(11,20,38,.55);
+  --ui-toast-bg:#0e1a33;
+  --ui-pre-bg:#0f1a30;
+  --ui-pre-fg:#cbd9f2;
+  --ui-tag-demo-bg:#f3e8ff;
+  --ui-tag-demo-fg:#7c3aed;
+  --ui-tag-generic-bg:#eef2f7;
+  --ui-tag-generic-fg:#64748b;
+  --ui-pill-ok-bg:#e9f8f0;
+  --ui-pill-ok-fg:#0b8f63;
+  --ui-pill-none-bg:#eef2f7;
+  --ui-pill-none-fg:#9aa8bd;
+  --ui-kv-bg:rgba(255,255,255,.7);
+  --ui-kv-line:rgba(0,0,0,.04);
+  --ui-warn-list:#6a5942;
+
+  --ui-sidebar-bg:#0e1a33;
+  --ui-sidebar-text:#dce6f8;
+  --ui-sidebar-muted:#9fb2d0;
+  --ui-sidebar-faint:#63799f;
+  --ui-sidebar-line:rgba(255,255,255,.09);
+}

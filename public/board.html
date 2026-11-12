@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>滚榜大屏 · RollBoard Studio</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%234f7bff'/%3E%3Ctext x='32' y='42' font-size='26' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'%3ERB%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/css/theme.css">
+<link rel="stylesheet" href="/css/board.css">
+<script src="/js/theme.js"></script>
+<script src="/vendor/schema.js"></script>
+<script src="/vendor/engine.js"></script>
+</head>
+<body>
+<div class="board-shell" id="boardShell">
+  <header class="board-head" id="boardHead">
+    <div class="bh-left">
+      <div class="logo">RB</div>
+      <div class="bh-title">
+        <h1 id="title">载入中…</h1>
+        <p id="subtitle">RollBoard Studio</p>
+      </div>
+    </div>
+    <div class="bh-center">
+      <select id="fileSelect" title="切换比赛数据文件"></select>
+      <div class="progress"><div id="progressBar"></div></div>
+    </div>
+    <div class="bh-right">
+      <div class="stat"><span>STEP</span><b id="progressText">0 / 0</b></div>
+      <div class="stat"><span>REMAIN</span><b id="remainText">0</b></div>
+      <div class="stat"><span>FREEZE</span><b id="freezeText">—</b></div>
+    </div>
+  </header>
+
+  <div class="reveal-bar" id="revealBar">
+    <div class="rb-label"><span class="pulse"></span><span id="rbLabelText">当前揭晓</span></div>
+    <div class="rb-team" id="rbTeam">准备就绪</div>
+    <div class="rb-prob" id="rbProb">—</div>
+    <div class="rb-result" id="rbResult">按空格或「开始滚榜」</div>
+    <div class="rb-rank" id="rbRank"></div>
+  </div>
+
+  <div class="stage">
+    <div class="table-wrap" id="tableWrap">
+      <table class="board-table">
+        <thead><tr id="headRow"></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="empty-state" id="emptyState" hidden>
+        <div class="es-icon">▤</div>
+        <h2>还没有滚榜数据</h2>
+        <p>先到管理台拉取比赛或生成演示数据</p>
+        <a class="btn" href="/">返回管理台</a>
+      </div>
+    </div>
+  </div>
+
+  <footer class="controls" id="controls">
+    <div class="ctl-group">
+      <button class="cbtn primary" id="playBtn" title="播放 / 暂停（空格）">▶ 开始滚榜</button>
+      <button class="cbtn" id="prevBtn" title="上一步（←）">◀</button>
+      <button class="cbtn" id="nextBtn" title="下一步（→）">▶</button>
+      <button class="cbtn" id="resetBtn" title="重置（R）">↺</button>
+      <button class="cbtn" id="endBtn" title="跳到最终榜单（E）">⏭ 终榜</button>
+      <button class="cbtn" id="pureBtn" title="纯净模式（P）：隐藏所有界面元素，只显示榜单">⛶ 纯净</button>
+    </div>
+    <div class="ctl-group right">
+      <label class="ctl-label">速度
+        <select id="speedSel">
+          <option value="2000">0.5×</option>
+          <option value="1000" selected>1×</option>
+          <option value="500">2×</option>
+          <option value="250">4×</option>
+          <option value="120">8×</option>
+          <option value="60">极速</option>
+        </select>
+      </label>
+      <button class="cbtn" id="helpBtn" title="快捷键帮助（H）">⌨</button>
+      <button class="cbtn" id="setBtn" title="设置（S）">⚙</button>
+      <button class="cbtn theme-btn" id="themeBtn" title="切换深色 / 浅色主题（T）">◐</button>
+      <button class="cbtn" id="fullBtn" title="全屏（F）">⛶</button>
+      <a class="cbtn" href="/setup.html" title="配置页">⚙ 设置</a>
+    </div>
+  </footer>
+
+  <!-- 设置抽屉：播放中可随时调，不打断现场 -->
+  <aside class="drawer" id="drawer" hidden>
+    <div class="drawer-head">
+      <h3>播放设置</h3>
+      <button class="icon-btn" id="drawerClose" title="关闭（Esc）">×</button>
+    </div>
+    <div class="drawer-body">
+      <label class="d-row">
+        <span>揭晓粒度</span>
+        <select id="modeSel">
+          <option value="problem" selected>一队一题</option>
+          <option value="submission">逐条提交</option>
+        </select>
+      </label>
+      <label class="d-row">
+        <span>播放速度</span>
+        <select id="speedSel2">
+          <option value="2000">0.5×</option>
+          <option value="1000" selected>1×</option>
+          <option value="500">2×</option>
+          <option value="250">4×</option>
+          <option value="120">8×</option>
+          <option value="60">极速</option>
+        </select>
+      </label>
+      <label class="d-row"><span>行移动动画</span><input type="checkbox" id="animChk" checked></label>
+      <label class="d-row"><span>打星队计入排名</span><input type="checkbox" id="starChk"></label>
+      <label class="d-row"><span>音效</span><input type="checkbox" id="soundChk" checked></label>
+      <label class="d-row"><span>焦点样式</span>
+        <select id="focusSel">
+          <option value="invert" selected>反色（对比最强）</option>
+          <option value="accent">主色高亮</option>
+        </select>
+      </label>
+      <div class="d-note">改动即时生效；「揭晓粒度」「打星队」会重建步骤，其余仅影响本次播放。</div>
+    </div>
+  </aside>
+  <div class="drawer-mask" id="drawerMask" hidden></div>
+
+  <!-- 纯净模式下的操作提示浮层：短暂出现后自动消失 -->
+  <div class="pure-hud" id="pureHud" hidden></div>
+
+  <!-- 快捷键帮助 -->
+  <div class="help-mask" id="helpMask" hidden>
+    <div class="help-card">
+      <div class="help-head">
+        <h3>现场快捷键</h3>
+        <button class="icon-btn" id="helpClose" title="关闭（Esc / H）">×</button>
+      </div>
+      <div class="help-grid" id="helpGrid"></div>
+      <div class="help-foot">键位可在<a href="/setup.html#keys" target="_blank">配置页</a>修改</div>
+    </div>
+  </div>
+
+  <!-- 终榜 -->
+  <div class="finale" id="finale" hidden>
+    <div class="finale-card">
+      <div class="finale-kicker">FINAL STANDINGS</div>
+      <h2>滚榜完成</h2>
+      <div class="finale-champion" id="championName">—</div>
+      <div class="finale-sub" id="championInfo">—</div>
+      <div class="finale-medals" id="finaleMedals"></div>
+      <div class="finale-actions">
+        <button class="cbtn primary" id="finaleReplay">↺ 重新滚榜</button>
+        <button class="cbtn" id="finaleClose">查看最终榜单</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 开场序幕（ICPC Resolver 的 splash screen） -->
+<div class="splash" id="splash" hidden>
+  <div class="splash-inner">
+    <div class="splash-kicker">ICPC RESOLVER STYLE · ROLLBOARD STUDIO</div>
+    <h1 id="splashTitle">比赛</h1>
+    <div class="splash-meta" id="splashMeta"></div>
+    <div class="splash-rule"></div>
+    <p class="splash-desc">从封榜瞬间的榜单出发，自榜尾逐行揭晓每一个未知结果，<br>直到全部名次与奖项尘埃落定。</p>
+    <div class="splash-hint">按 <kbd>空格</kbd> 或点击任意处开始</div>
+  </div>
+</div>
+
+<!-- 全屏奖项页（ICPC Resolver 的 award citation） -->
+<div class="award-screen" id="awardScreen" hidden>
+  <div class="award-emblem" id="awardEmblem">★</div>
+  <div class="award-kicker" id="awardKicker">GOLD MEDAL</div>
+  <h2 id="awardTitle">金 奖</h2>
+  <div class="award-team" id="awardTeam">—</div>
+  <div class="award-org" id="awardOrg"></div>
+  <div class="award-citation" id="awardCitation"></div>
+  <div class="award-rank" id="awardRank"></div>
+  <div class="award-hint">按 → 或空格继续</div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/theme-ui.js"></script>
+<script src="/js/keys.js"></script>
+<script src="/js/board.js"></script>
+</body>
+</html>

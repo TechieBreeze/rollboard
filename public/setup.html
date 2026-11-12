@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>配置 · RollBoard Studio</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%234f7bff'/%3E%3Ctext x='32' y='42' font-size='26' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'%3ERB%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/css/theme.css">
+<link rel="stylesheet" href="/css/app.css">
+<link rel="stylesheet" href="/css/setup.css">
+<script src="/js/theme.js"></script>
+</head>
+<body>
+<div class="setup-shell">
+  <aside class="setup-side">
+    <div class="brand">
+      <div class="brand-mark">RB</div>
+      <div>
+        <div class="brand-name">RollBoard Studio</div>
+        <div class="brand-sub">配置中心</div>
+      </div>
+    </div>
+    <nav class="setup-nav">
+      <a class="setup-nav-item active" href="#sources"><span class="ni">01</span> 数据源</a>
+      <a class="setup-nav-item" href="#defaults"><span class="ni">02</span> 拉取默认值</a>
+      <a class="setup-nav-item" href="#medals"><span class="ni">03</span> 奖牌名额</a>
+      <a class="setup-nav-item" href="#board"><span class="ni">04</span> 播放默认值</a>
+      <a class="setup-nav-item" href="#keys"><span class="ni">05</span> 快捷键</a>
+    </nav>
+    <div class="setup-foot">
+      <div class="side-hint">配置保存在本机 <code>data/config.json</code></div>
+      <div class="setup-foot-actions">
+        <button class="btn btn-ghost" id="resetCfgBtn">恢复默认</button>
+        <button class="btn btn-primary" id="saveCfgBtn">保存配置</button>
+      </div>
+    </div>
+  </aside>
+
+  <main class="setup-main">
+    <header class="topbar">
+      <div>
+        <h1>配置</h1>
+        <p>这里集中管理所有可调项。滚榜大屏会自动读取其中的播放默认值。</p>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn" id="themeBtnTop" title="切换深色 / 浅色主题（T）">◐ 浅色</button>
+        <a class="btn btn-primary btn-lg" href="/" target="_blank">← 返回工作台</a>
+      </div>
+    </header>
+
+    <!-- 数据源 -->
+    <section class="section" id="sources">
+      <div class="sec-head">
+        <div><h2>01 · 数据源</h2><p>配置本机 / 内网部署的 OJ 地址。密码只在本次请求使用，不会写入磁盘。</p></div>
+        <button class="btn" id="addSourceBtn">＋ 新增数据源</button>
+      </div>
+      <div id="sourceList" class="source-grid"></div>
+    </section>
+
+    <!-- 拉取默认值 -->
+    <section class="section" id="defaults">
+      <div class="sec-head">
+        <div><h2>02 · 拉取默认值</h2><p>新拉取比赛时自动填入这里的值，省去每次重复输入。</p></div>
+      </div>
+      <div class="panel">
+        <div class="form-grid">
+          <label class="field">
+            <span>默认数据源</span>
+            <select id="cSource"></select>
+          </label>
+          <label class="field">
+            <span>默认比赛 ID / CID</span>
+            <input id="cContest" placeholder="例如 3 或 nwerc18" autocomplete="off">
+          </label>
+          <label class="field">
+            <span>默认 API 用户名 <em>（DOMjudge 需 jury/admin）</em></span>
+            <input id="cUser" placeholder="留空表示匿名访问" autocomplete="off">
+          </label>
+          <label class="field">
+            <span>默认 API 密码 / Token <em>（仅存于本次浏览器会话，不落盘）</em></span>
+            <input id="cPass" type="password" placeholder="留空表示不记忆" autocomplete="new-password">
+          </label>
+          <label class="field">
+            <span>默认封榜时刻 <em>（结束前 N 分钟）</em></span>
+            <input id="cFreeze" type="number" min="0" placeholder="留空则用 OJ 配置">
+          </label>
+          <label class="field">
+            <span>默认文件名 ID <em>（留空自动生成）</em></span>
+            <input id="cFileId" placeholder="例如 2026-final">
+          </label>
+          <label class="field wide">
+            <span>默认比赛标题 <em>（留空用 OJ 上的名称）</em></span>
+            <input id="cTitle" placeholder="例如 2026 校赛决赛">
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- 奖牌 -->
+    <section class="section" id="medals">
+      <div class="sec-head">
+        <div><h2>03 · 奖牌名额</h2><p>决定滚榜时会在哪个名次触发金银铜奖的全屏展示页。</p></div>
+      </div>
+      <div class="panel">
+        <div class="medal-row">
+          <span>奖牌名额</span>
+          <label>金 <input id="cGold" type="number" min="0" value="4"></label>
+          <label>银 <input id="cSilver" type="number" min="0" value="6"></label>
+          <label>铜 <input id="cBronze" type="number" min="0" value="8"></label>
+          <label class="chk"><input type="checkbox" id="cHidden"> 包含隐藏队伍</label>
+          <label class="chk"><input type="checkbox" id="cInsecure"> 允许自签名 HTTPS</label>
+        </div>
+      </div>
+    </section>
+
+    <!-- 播放默认值 -->
+    <section class="section" id="board">
+      <div class="sec-head">
+        <div><h2>04 · 播放默认值</h2><p>打开大屏时自动应用的初始状态，现场仍可在控制条临时调整。</p></div>
+      </div>
+      <div class="panel">
+        <div class="form-grid">
+          <label class="field">
+            <span>默认主题</span>
+            <select id="cTheme">
+              <option value="auto">跟随系统</option>
+              <option value="dark">深色</option>
+              <option value="light">浅色</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>默认播放速度</span>
+            <select id="cSpeed">
+              <option value="2000">0.5×</option>
+              <option value="1000">1×</option>
+              <option value="500">2×</option>
+              <option value="250">4×</option>
+              <option value="120">8×</option>
+              <option value="60">极速</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>默认揭晓粒度</span>
+            <select id="cMode">
+              <option value="problem">一队一题</option>
+              <option value="submission">逐条提交</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>焦点行样式</span>
+            <select id="cFocus">
+              <option value="invert">反色（对比最强）</option>
+              <option value="accent">主色高亮（更柔和）</option>
+            </select>
+          </label>
+        </div>
+        <div class="actions">
+          <label class="ctl-check"><input type="checkbox" id="cStar"> 打星队计入排名</label>
+          <label class="ctl-check"><input type="checkbox" id="cAnim" checked> 行移动动画</label>
+          <label class="ctl-check"><input type="checkbox" id="cSound" checked> 音效</label>
+        </div>
+      </div>
+    </section>
+
+    <!-- 快捷键 -->
+    <section class="section" id="keys">
+      <div class="sec-head">
+        <div><h2>05 · 快捷键</h2><p>现场操作全靠键盘，这里可以改成你顺手的组合。点击输入框后按下想要的键即可录制。</p></div>
+        <button class="btn btn-ghost" id="resetKeysBtn">恢复默认键位</button>
+      </div>
+      <div class="panel">
+        <div id="keyList" class="key-list"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- 数据源弹窗 -->
+<div class="modal-mask" id="sourceModal" hidden>
+  <div class="modal">
+    <div class="modal-head"><h3 id="modalTitle">新增数据源</h3><button class="icon-btn" id="closeModal">×</button></div>
+    <div class="form-grid">
+      <label class="field"><span>名称</span><input id="sName" placeholder="本机 DOMjudge"></label>
+      <label class="field"><span>类型</span><select id="sType"><option value="domjudge">DOMjudge (v4 / Contest API)</option><option value="hoj">HOJ (Hcode Online Judge)</option></select></label>
+      <label class="field wide"><span>Base URL</span><input id="sUrl" placeholder="http://127.0.0.1:8080"></label>
+      <label class="field"><span>默认用户名（可选）</span><input id="sUser" autocomplete="off"></label>
+      <label class="field"><span>请求超时（毫秒）</span><input id="sTimeout" type="number" value="20000"></label>
+      <label class="field wide"><span>备注</span><input id="sNote" placeholder="例如：机房 A 的比赛服务器"></label>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" id="saveSourceBtn">保存数据源</button>
+      <button class="btn btn-ghost" id="cancelModal">取消</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<script src="/js/api.js"></script>
+<script src="/js/theme-ui.js"></script>
+<script src="/js/keys.js"></script>
+<script src="/js/setup.js"></script>
+</body>
+</html>

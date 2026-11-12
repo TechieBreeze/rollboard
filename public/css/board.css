@@ -1,0 +1,368 @@
+/* ICPC Resolver 风格：条纹行、宽扁胶囊、整行反色高亮
+   颜色全部来自 theme.css 的 --rb-* 令牌，深浅两套主题共用这一份结构 */
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--rb-bg);color:var(--rb-text);overflow:hidden;
+  font-family:var(--font-sans);transition:background .25s ease,color .25s ease}
+button,select,input{font-family:inherit;font-size:inherit}
+a{color:inherit;text-decoration:none}
+.board-shell{height:100vh;display:flex;flex-direction:column;position:relative}
+
+/* ---------------- 顶栏 ---------------- */
+.board-head{height:72px;flex:0 0 72px;display:flex;align-items:center;gap:26px;padding:0 24px;background:var(--rb-bar-bg);border-bottom:1px solid var(--rb-line);transition:background .25s ease,border-color .25s ease}
+.bh-left{display:flex;align-items:center;gap:13px;min-width:290px}
+.logo{width:38px;height:38px;border-radius:9px;background:linear-gradient(135deg,#3b6cf0,#7a4de0);display:grid;place-items:center;font-weight:800;font-size:13px;letter-spacing:.5px;color:#fff}
+.bh-title h1{margin:0;font-size:18px;font-weight:750;letter-spacing:-.3px;white-space:nowrap;max-width:500px;overflow:hidden;text-overflow:ellipsis}
+.bh-title p{margin:2px 0 0;font-size:11px;color:var(--rb-muted);letter-spacing:.5px}
+.bh-center{flex:1;display:flex;align-items:center;gap:16px;min-width:160px}
+.bh-center select{background:var(--rb-head);border:1px solid var(--rb-line);color:var(--rb-muted);border-radius:6px;padding:6px 9px;max-width:220px;outline:none;font-size:11.5px}
+.progress{flex:1;height:5px;border-radius:20px;background:var(--rb-track);overflow:hidden}
+/* 进度条：过渡时长同样随步进自适应，高速档下进度条才不会「慢半拍」 */
+.progress>div{height:100%;width:0;border-radius:20px;background:var(--rb-progress-grad);transition:width var(--rb-fx-t,.18s) ease}
+.bh-right{display:flex;gap:20px;align-items:center}
+.stat{text-align:right;min-width:68px}
+.stat span{display:block;font-size:9px;color:var(--rb-faint);letter-spacing:1.6px;font-weight:700}
+.stat b{font-size:17px;font-variant-numeric:tabular-nums;letter-spacing:.3px}
+
+/* ---------------- 状态条 ---------------- */
+.reveal-bar{height:58px;flex:0 0 58px;display:flex;align-items:center;gap:18px;padding:0 24px;background:var(--rb-bar-grad);border-bottom:1px solid var(--rb-line);transition:background .3s,border-color .25s ease}
+.reveal-bar.ceremony{background:var(--rb-bar-grad-ceremony)}
+.rb-label{font-size:10px;letter-spacing:1.6px;color:var(--rb-muted);display:flex;align-items:center;gap:8px;white-space:nowrap;font-weight:700}
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--rb-blue);box-shadow:0 0 0 0 rgba(91,141,255,.7);animation:pulse 1.8s infinite}
+@keyframes pulse{70%{box-shadow:0 0 0 9px rgba(91,141,255,0)}100%{box-shadow:0 0 0 0 rgba(91,141,255,0)}}
+.reveal-bar.ceremony .pulse{background:var(--rb-gold)}
+.rb-team{font-size:19px;font-weight:750;min-width:200px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rb-prob{width:40px;height:40px;border-radius:8px;background:var(--rb-input-bg);border:1px solid var(--rb-input-line);display:grid;place-items:center;font-weight:800;font-size:19px;transition:.2s;color:var(--rb-text)}
+.rb-prob.waiting{background:var(--rb-wait-bg);border-color:var(--rb-blue);color:var(--rb-wait-fg)}
+/* 原来这里挂的是 `animation:selPulse .9s infinite`。
+   高速档下焦点每步都换、每次都重新挂上 waiting 类 → 无限动画每步重启，
+   徽标整步都停在起始帧，看着就是一个「一闪一闪」的亮点。
+   现在改成一次性脉冲（WAAPI，见 board.js 的 pulseSelect 思路），
+   静态边框本身已经足够表达「待揭晓」。 */
+.rb-result{font-size:12.5px;color:var(--rb-muted);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rb-result.ac{color:var(--rb-ac-text);font-weight:700;font-size:14px}
+.rb-result.wa{color:var(--rb-wa-text)}
+.rb-rank{font-size:12px;font-weight:700;color:var(--rb-gold);white-space:nowrap;min-width:130px;text-align:right}
+/* 名次上升提示已改用 WAAPI（public/js/board.js 的 rankPop）。
+   原 class 方案起始帧 opacity:0 + 写死 700ms，高速档下每步重启，
+   名次文字整步不可见 —— 看起来就是「文字在闪」。 */
+
+/* ---------------- 榜单 ---------------- */
+.stage{flex:1;min-height:0;padding:8px 18px 2px;position:relative}
+.table-wrap{height:100%;overflow:auto;border:1px solid var(--rb-line);border-radius:6px;background:var(--rb-tbl-bg);scrollbar-width:thin;scrollbar-color:var(--rb-scroll) transparent;transition:background .25s ease,border-color .25s ease}
+.table-wrap::-webkit-scrollbar{width:8px;height:8px}
+.table-wrap::-webkit-scrollbar-thumb{background:var(--rb-scroll);border-radius:5px}
+.board-table{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:0;font-size:13px}
+.board-table thead th{position:sticky;top:0;z-index:5;background:var(--rb-head);color:var(--rb-faint);font-size:9.5px;letter-spacing:1.4px;font-weight:800;text-transform:uppercase;padding:8px 8px;border-bottom:1px solid var(--rb-head-line);white-space:nowrap;text-align:center;height:30px;transition:background .25s ease,color .25s ease}
+.board-table thead th.rank-col{width:58px;text-align:left;padding-left:14px}
+.board-table thead th.team-col{text-align:left;width:27%;min-width:250px;padding-left:8px}
+.board-table thead th.score-col{width:68px}
+.board-table thead th.time-col{width:78px}
+.board-table thead th.prob-col{border-top:3px solid var(--pc,var(--rb-prob-border));color:var(--rb-prob-col);font-size:11px}
+
+/* 行位移用 WAAPI 播放（见 public/js/board.js 的 FLIP 段），
+   这里不再挂 transform 的 transition，避免两套动画互相打架。
+   背景/前景色的过渡时长同样自适应：焦点行反色切换时整行会变色，
+   写死 250ms 时高速档下每次焦点移动都留一堆未完成的过渡。 */
+.board-table tbody tr{height:46px;transition:background var(--rb-fx-t,.18s) ease,color var(--rb-fx-t,.18s) ease}
+.board-table tbody tr:nth-child(odd){background:var(--rb-stripe-a)}
+.board-table tbody tr:nth-child(even){background:var(--rb-stripe-b)}
+.table-wrap.flipping tbody tr{transition:none!important}
+.board-table tbody td{padding:4px 7px;border-bottom:1px solid var(--rb-row-line);text-align:center;vertical-align:middle;white-space:nowrap}
+
+/* 焦点行：整行反色，ICPC Resolver 的标志性高亮 */
+.board-table tbody tr.focus,
+.board-table tbody tr.focus:nth-child(odd),
+.board-table tbody tr.focus:nth-child(even){background:var(--rb-focus-bg);color:var(--rb-focus-fg);box-shadow:var(--rb-focus-shadow)}
+.board-table tbody tr.focus .rank-num{color:var(--rb-focus-rank)}
+.board-table tbody tr.focus .team-name{color:var(--rb-focus-team)}
+.board-table tbody tr.focus .team-org{color:var(--rb-focus-org)}
+.board-table tbody tr.focus .solved-num,
+.board-table tbody tr.focus .penalty-num{color:var(--rb-focus-num)}
+.board-table tbody tr.focus .pcell.blank{background:var(--rb-focus-cell-bg);color:var(--rb-focus-cell-fg)}
+.board-table tbody tr.starred{opacity:.65}
+
+/* 焦点样式二：主色高亮（不反色，视觉冲击更柔和） */
+body.focus-accent .board-table tbody tr.focus,
+body.focus-accent .board-table tbody tr.focus:nth-child(odd),
+body.focus-accent .board-table tbody tr.focus:nth-child(even){
+  background:var(--rb-accent-focus-bg);color:var(--rb-accent-focus-fg);
+  box-shadow:inset 5px 0 0 var(--rb-gold);
+}
+body.focus-accent .board-table tbody tr.focus .rank-num{color:var(--rb-accent-focus-fg)}
+body.focus-accent .board-table tbody tr.focus .team-name{color:var(--rb-accent-focus-fg)}
+body.focus-accent .board-table tbody tr.focus .team-org{color:rgba(255,255,255,.7)}
+body.focus-accent .board-table tbody tr.focus .solved-num,
+body.focus-accent .board-table tbody tr.focus .penalty-num{color:var(--rb-accent-focus-fg)}
+body.focus-accent .board-table tbody tr.focus .pcell.blank{background:rgba(255,255,255,.16);color:rgba(255,255,255,.55)}
+body.focus-accent .focus .pcell.selecting{outline-color:var(--rb-target-ring)}
+.board-table tbody tr.medal-gold .rank-cell{box-shadow:inset 3px 0 0 var(--rb-gold)}
+.board-table tbody tr.medal-silver .rank-cell{box-shadow:inset 3px 0 0 var(--rb-silver)}
+.board-table tbody tr.medal-bronze .rank-cell{box-shadow:inset 3px 0 0 var(--rb-bronze)}
+.board-table tbody tr.focus.medal-gold .rank-cell,
+.board-table tbody tr.focus.medal-silver .rank-cell,
+.board-table tbody tr.focus.medal-bronze .rank-cell{box-shadow:none}
+
+.rank-cell{text-align:left!important;padding-left:14px!important}
+.rank-num{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--rb-rank-num)}
+.focus .rank-num::before{content:'▸';color:var(--rb-focus-arrow);font-size:12px;margin-right:4px;vertical-align:1px}
+.medal-gold .rank-num{color:var(--rb-gold)}
+.medal-silver .rank-num{color:var(--rb-silver)}
+.medal-bronze .rank-num{color:var(--rb-bronze)}
+
+.team-cell{text-align:left!important;padding-left:8px!important}
+.team-wrap{display:flex;align-items:center;gap:10px;min-width:0}
+.team-badge{flex:0 0 30px;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:800;color:#fff;background:var(--badge,#3b4a63);box-shadow:0 0 0 2px var(--rb-badge-ring)}
+.team-text{min-width:0}
+.team-name{font-weight:700;font-size:15.5px;letter-spacing:-.2px;overflow:hidden;text-overflow:ellipsis;max-width:340px;color:var(--rb-team-name)}
+.team-org{font-size:10px;color:var(--rb-faint);margin-top:1px;overflow:hidden;text-overflow:ellipsis;max-width:340px}
+.star-badge{font-size:9px;color:var(--rb-gold);border:1px solid var(--rb-gold-line);border-radius:3px;padding:0 4px;margin-left:6px}
+.solved-num{font-size:18px;font-weight:800;color:var(--rb-solved);font-variant-numeric:tabular-nums}
+.focus .solved-num{color:var(--rb-focus-solved)!important}
+.penalty-num{font-size:12.5px;color:var(--rb-penalty);font-variant-numeric:tabular-nums}
+
+/* 题目胶囊 */
+/* 底色过渡时长由 JS 按当前步进间隔自适应（--rb-fx-t）：
+   写死 180ms 时，高速档（60ms 一步）的过渡来不及完成就被下一次打断，
+   背景色看起来是「啪一下跳变」，而不是平滑过渡。 */
+.prob-cell{padding:4px 3px!important}
+.pcell{display:flex;align-items:center;justify-content:center;gap:2px;width:100%;height:25px;border-radius:5px;font-size:11.5px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1;position:relative;transition:background var(--rb-fx-t,.18s) ease,color var(--rb-fx-t,.18s) ease}
+.pcell small{font-size:9.5px;font-weight:600;opacity:.75}
+.pcell.blank{background:var(--rb-cell-empty);color:var(--rb-cell-empty-fg);font-size:12px}
+.pcell.solved{background:var(--rb-cell-ac);color:var(--rb-cell-ac-fg)}
+.pcell.failed{background:var(--rb-cell-wa);color:var(--rb-cell-wa-fg)}
+.pcell.pending{background:var(--rb-cell-pending);color:var(--rb-cell-pending-fg)}
+.pcell.firstblood::after{content:'FB';position:absolute;top:-6px;right:-3px;font-size:8px;background:var(--rb-gold);color:var(--rb-gold-fg);border-radius:3px;padding:0 3px;font-weight:900}
+/* 高亮待揭晓格子：描边是常驻语义（表示"这个格子待揭晓"），脉动只是附加效果。
+   脉动改用 WAAPI 播放（见 public/js/board.js 的 pulseSelect），
+   避免 class 被 clearHighlights 移除时动画被打断重来。
+
+   ⚠ 描边**不能随焦点行变化**。
+   揭晓导致队伍上升时，焦点会按规则让给被挤下来的下一支队伍（焦点停在名次槽位）。
+   如果描边样式依赖 .focus，那么揭晓的瞬间目标格的描边就会从
+   「焦点行样式」跳到「普通行样式」—— 观众的眼睛锚点被当场拽走，
+   看着就像「闪了一下 / 跳了一步」。
+
+   所以目标格统一用**双层描边**：外圈亮色 + 内圈 1px 对比色 halo。
+   双层的好处是无论落在反色的焦点行、琥珀色的待揭晓格，
+   还是绿色/红色的揭晓结果上，描边都清晰可见，且外观完全一致。 */
+.pcell.selecting{
+  outline:3px solid var(--rb-target-ring);
+  outline-offset:1px;
+  box-shadow:0 0 0 1px var(--rb-target-halo),0 0 16px var(--rb-target-glow);
+  z-index:2
+}
+/* 揭晓闪光已改用 WAAPI（public/js/board.js 的 flashAc / flashWa）。
+   CSS 动画会在 clearHighlights 移除 class 时被硬生生打断，高速档下
+   每步都卡在第 0 帧（白闪 + 侧躺），视觉上就是频闪。 */
+.pcell.flash-ac,.pcell.flash-wa{z-index:2}
+
+/* ---------------- 焦点行进场 / 离场 ---------------- */
+/* 光扫是一个放在滚动容器里的绝对定位覆盖层（JS 每次设置 top/height）。
+   不能塞进 <tr> —— tr 只允许 td/th 子元素。 */
+.table-wrap{position:relative}
+.focus-sweep{
+  position:absolute;left:0;right:0;z-index:4;pointer-events:none;
+  background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.30) 42%,transparent 78%);
+  opacity:0;
+}
+/* 覆盖层跟随表格定位（相对 table，而非滚动容器），滚动时自然跟随 */
+.board-table{position:relative}
+body.focus-accent .focus-sweep{
+  background:linear-gradient(90deg,transparent 0%,rgba(255,255,255,.34) 42%,transparent 78%);
+}
+
+/* 名次数字换位时的轻微弹跳（WAAPI 不可用时的兜底） */
+.rank-num.bump{animation:rankBump .5s cubic-bezier(.3,1.4,.5,1)}
+@keyframes rankBump{0%{transform:translateY(-42%) scale(.9);opacity:.35}60%{transform:translateY(6%) scale(1.06)}100%{transform:none;opacity:1}}
+/* 通过数增加时的金色闪烁（WAAPI 不可用时的兜底） */
+.solved-num.gain{animation:solvedGain .8s ease-out}
+@keyframes solvedGain{0%{color:var(--rb-gold);text-shadow:0 0 18px rgba(242,193,78,.9)}100%{text-shadow:none}}
+
+/* 焦点行上的待揭晓格子：轻微呼吸，只影响当前焦点行，数量恒定。
+   关键：只在**慢速档**（body.fx-calm，JS 按步进预算添加）才允许呼吸。
+   高速档下焦点每 40~120ms 就换一行，CSS 动画每步都会重新开始，
+   格子始终停在关键帧 0% —— 那就是「一格一格地闪」。 */
+body.fx-calm .board-table tbody tr.focus .pcell.pending{animation:breathe 2.4s ease-in-out 3}
+@keyframes breathe{50%{filter:brightness(1.16)}}
+
+/* 高速档（预算 < 70ms）：彻底关掉背景/前景色的 transition。
+   40ms 的渐变人眼几乎察觉不到，只会在每步边界产生微弱的「跳变感」——
+   与其让一堆过渡互相打断，不如直接切换：状态干脆，反而不闪。 */
+body.fx-off .pcell,
+body.fx-off .board-table tbody tr,
+body.fx-off .progress>div{transition:none}
+
+.empty-state{position:absolute;inset:0;display:grid;place-content:center;text-align:center;gap:8px;color:var(--rb-muted)}
+.empty-state[hidden]{display:none}
+.es-icon{font-size:42px;color:var(--rb-empty-icon)}
+.empty-state h2{margin:6px 0 0;font-size:19px;color:var(--rb-text)}
+.empty-state p{margin:0 0 14px;font-size:12.5px}
+.empty-state .btn{display:inline-block;background:var(--rb-blue);color:#fff;padding:9px 20px;border-radius:7px;font-weight:700;font-size:13px}
+
+/* ---------------- 控制条 ---------------- */
+.controls{height:56px;flex:0 0 56px;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 22px;border-top:1px solid var(--rb-line);background:var(--rb-bar-bg);flex-wrap:wrap;transition:background .25s ease,border-color .25s ease}
+.ctl-group{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.ctl-group.right{justify-content:flex-end}
+.cbtn{background:var(--rb-ctl-bg);border:1px solid var(--rb-ctl-line);color:var(--rb-ctl-fg);border-radius:6px;padding:7px 12px;font-size:12px;font-weight:650;cursor:pointer;transition:.15s;white-space:nowrap}
+.cbtn:hover{background:var(--rb-ctl-hover);border-color:var(--rb-ctl-hover-line);color:var(--rb-ctl-hover-fg)}
+.cbtn.primary{background:var(--rb-primary-grad);border-color:#5270ff;color:#fff}
+.cbtn.primary:hover{filter:brightness(1.12)}
+.ctl-label{font-size:11px;color:var(--rb-muted);display:flex;align-items:center;gap:5px}
+.ctl-label select{background:var(--rb-ctl-bg);border:1px solid var(--rb-ctl-line);color:var(--rb-ctl-fg);border-radius:6px;padding:5px 7px;outline:none;font-size:11.5px}
+.ctl-check{font-size:11px;color:var(--rb-muted);display:flex;align-items:center;gap:4px;cursor:pointer}
+.ctl-check input{accent-color:var(--rb-blue)}
+.theme-btn{min-width:34px;text-align:center}
+
+/* ---------------- 序幕 ---------------- */
+.splash{position:fixed;inset:0;z-index:60;background:var(--rb-splash-grad);display:grid;place-items:center;cursor:pointer;animation:fadeIn .6s ease}
+.splash[hidden]{display:none}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.splash-inner{text-align:center;padding:30px}
+.splash-kicker{font-size:10.5px;letter-spacing:5px;color:var(--rb-gold);font-weight:700}
+.splash h1{margin:20px 0 10px;font-size:clamp(32px,5vw,64px);font-weight:850;letter-spacing:-1.5px;line-height:1.15;text-shadow:0 0 50px var(--rb-splash-glow)}
+.splash-meta{font-size:14px;color:var(--rb-panel-muted);letter-spacing:1px}
+.splash-rule{width:120px;height:2px;background:linear-gradient(90deg,transparent,var(--rb-gold),transparent);margin:26px auto}
+.splash-desc{font-size:13px;line-height:2;color:var(--rb-panel-dim);margin:0}
+.splash-hint{margin-top:38px;font-size:12.5px;color:var(--rb-splash-hint)}
+.splash kbd{background:var(--rb-kbd-bg);border:1px solid var(--rb-kbd-line);border-bottom-width:2px;border-radius:5px;padding:2px 9px;font-family:inherit;color:var(--rb-kbd-fg);margin:0 3px}
+
+/* ---------------- 全屏奖项页 ---------------- */
+/* 底色必须完全不透明：渐变起始色若带 alpha 会透出后面的榜单 */
+.award-screen{position:fixed;inset:0;z-index:55;background-color:var(--rb-bg);background-image:var(--rb-award-grad);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;animation:awardIn .55s cubic-bezier(.2,.9,.3,1.1);transition:background-color .25s ease}
+.award-screen[hidden]{display:none}
+@keyframes awardIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)}}
+.award-screen.silver{background-image:var(--rb-award-grad-silver)}
+.award-screen.bronze{background-image:var(--rb-award-grad-bronze)}
+.award-screen.blood{background-image:var(--rb-award-grad-blood)}
+.award-emblem{width:88px;height:88px;border-radius:50%;display:grid;place-items:center;font-size:38px;font-weight:800;color:var(--rb-emblem-fg);background:var(--rb-gold);box-shadow:0 0 60px rgba(242,193,78,.45);margin-bottom:24px}
+.award-screen.silver .award-emblem{background:var(--rb-silver);box-shadow:0 0 60px rgba(185,201,223,.35)}
+.award-screen.bronze .award-emblem{background:var(--rb-bronze);box-shadow:0 0 60px rgba(207,139,87,.35)}
+.award-screen.blood .award-emblem{background:var(--rb-blue);color:#fff;box-shadow:0 0 60px rgba(91,141,255,.45)}
+.award-kicker{font-size:11px;letter-spacing:6px;color:var(--rb-gold);font-weight:800}
+.award-screen.silver .award-kicker{color:var(--rb-silver)}
+.award-screen.bronze .award-kicker{color:var(--rb-bronze)}
+.award-screen.blood .award-kicker{color:var(--rb-blood-fg)}
+.award-screen h2{margin:10px 0 22px;font-size:clamp(38px,5vw,62px);font-weight:900;letter-spacing:12px;color:var(--rb-gold);text-shadow:0 0 45px rgba(242,193,78,.4)}
+.award-screen.silver h2{color:var(--rb-silver);text-shadow:0 0 45px rgba(185,201,223,.3)}
+.award-screen.bronze h2{color:var(--rb-bronze);text-shadow:0 0 45px rgba(207,139,87,.3)}
+.award-screen.blood h2{color:var(--rb-blood-fg-strong);text-shadow:0 0 45px rgba(91,141,255,.4)}
+.award-team{font-size:clamp(26px,3.6vw,44px);font-weight:800;letter-spacing:-.5px}
+.award-org{font-size:14px;color:var(--rb-panel-muted);margin-top:8px}
+.award-citation{font-size:14px;color:var(--rb-panel-text);margin-top:22px;letter-spacing:.5px}
+.award-rank{font-size:12px;color:var(--rb-muted);margin-top:10px}
+.award-hint{position:absolute;bottom:34px;font-size:11px;color:var(--rb-panel-faint);letter-spacing:1px}
+
+/* ---------------- 终榜 ---------------- */
+.finale{position:fixed;inset:0;background:var(--rb-overlay);display:grid;place-items:center;z-index:58;animation:fadeIn .5s ease;transition:background .25s ease}
+.finale[hidden]{display:none}
+.finale-card{width:min(660px,92vw);background:var(--rb-panel-grad);border:1px solid var(--rb-panel-line);border-radius:16px;padding:36px;text-align:center;box-shadow:0 30px 90px rgba(0,0,0,.45)}
+.finale-kicker{font-size:10.5px;letter-spacing:5px;color:var(--rb-gold);font-weight:700}
+.finale-card h2{margin:10px 0 20px;font-size:28px}
+.finale-champion{font-size:27px;font-weight:850;color:var(--rb-gold);text-shadow:0 0 30px rgba(242,193,78,.4)}
+.finale-sub{font-size:12.5px;color:var(--rb-muted);margin-top:4px}
+.finale-medals{display:flex;justify-content:center;gap:9px;margin:24px 0;flex-wrap:wrap}
+.fm{border:1px solid var(--rb-panel-line);border-radius:8px;padding:8px 12px;font-size:11.5px;background:var(--rb-panel-solid);min-width:130px;text-align:left}
+.fm b{display:block;font-size:12.5px;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fm span{font-size:10px;color:var(--rb-faint)}
+.fm.gold b{color:var(--rb-gold)}.fm.silver b{color:var(--rb-silver)}.fm.bronze b{color:var(--rb-bronze)}
+.finale-actions{display:flex;gap:9px;justify-content:center}
+
+@media (max-width:1200px){
+  .bh-right{display:none}
+  .rb-team{font-size:15px;min-width:150px}
+  .controls{height:auto;flex:0 0 auto;padding:9px 14px}
+}
+
+/* ============================================================
+   纯净模式：实际滚榜时屏幕上只有榜单
+   顶栏 / 状态条 / 控制条全部退场，表格占满视口
+   ============================================================ */
+body.pure{cursor:none}
+body.pure.pure-show-cursor{cursor:default}
+
+body.pure .board-head,
+body.pure .reveal-bar,
+body.pure .controls,
+body.pure .drawer,
+body.pure .drawer-mask{
+  display:none!important;
+}
+body.pure .board-shell{height:100vh}
+body.pure .stage{padding:0}
+body.pure .table-wrap{
+  border:0;border-radius:0;height:100%;
+  scrollbar-width:none;
+}
+body.pure .table-wrap::-webkit-scrollbar{width:0;height:0}
+body.pure .board-table thead th{position:static}
+body.pure .board-table tbody tr{height:52px}
+body.pure .board-table tbody td{padding:6px 8px}
+body.pure .pcell{height:29px;font-size:12.5px}
+body.pure .team-name{font-size:17px}
+body.pure .rank-num{font-size:19px}
+body.pure .solved-num{font-size:20px}
+
+/* 纯净模式下的操作提示：短暂浮层，不干扰观众 */
+.pure-hud{
+  position:fixed;left:50%;bottom:42px;transform:translateX(-50%);
+  z-index:70;display:flex;align-items:center;gap:14px;
+  padding:11px 20px;border-radius:11px;
+  background:var(--rb-hud-bg);color:var(--rb-hud-fg);
+  border:1px solid var(--rb-hud-line);
+  box-shadow:0 14px 44px rgba(0,0,0,.45);
+  font-size:14px;font-weight:600;letter-spacing:.3px;
+  opacity:0;transition:opacity .22s ease,transform .22s ease;
+  pointer-events:none;white-space:nowrap;
+}
+.pure-hud.show{opacity:1;transform:translateX(-50%) translateY(-6px)}
+.pure-hud kbd{
+  background:rgba(127,127,127,.22);border:1px solid rgba(127,127,127,.4);
+  border-bottom-width:2px;border-radius:5px;padding:2px 8px;
+  font-family:inherit;font-size:12.5px;font-weight:700;
+}
+.pure-hud .hud-sep{opacity:.35;font-weight:400}
+
+/* ---------------- 设置抽屉 ---------------- */
+.drawer-mask{position:fixed;inset:0;background:var(--rb-overlay);z-index:44;opacity:0;transition:opacity .2s ease}
+.drawer-mask.show{opacity:1}
+.drawer{
+  position:fixed;top:0;right:0;bottom:0;width:320px;z-index:45;
+  background:var(--rb-drawer-bg);border-left:1px solid var(--rb-line);
+  box-shadow:-18px 0 48px rgba(0,0,0,.4);
+  display:flex;flex-direction:column;
+  transform:translateX(100%);transition:transform .24s cubic-bezier(.22,.8,.28,1);
+}
+.drawer.show{transform:translateX(0)}
+.drawer-head{height:56px;flex:0 0 56px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;border-bottom:1px solid var(--rb-line)}
+.drawer-head h3{margin:0;font-size:15px;font-weight:700}
+.drawer-body{padding:16px 18px;overflow:auto;display:flex;flex-direction:column;gap:4px}
+.d-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--rb-row-line);font-size:13px}
+.d-row:last-of-type{border-bottom:0}
+.d-row select{
+  background:var(--rb-ctl-bg);border:1px solid var(--rb-ctl-line);color:var(--rb-ctl-fg);
+  border-radius:6px;padding:5px 8px;outline:none;font-size:12.5px;min-width:132px
+}
+.d-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--rb-blue)}
+.d-note{margin-top:14px;font-size:11.5px;line-height:1.7;color:var(--rb-faint);padding:11px 12px;border-radius:8px;background:var(--rb-surface-2)}
+
+/* ---------------- 快捷键帮助 ---------------- */
+.help-mask{position:fixed;inset:0;z-index:80;background:var(--rb-overlay);display:grid;place-items:center;padding:24px;animation:fadeIn .18s ease}
+.help-mask[hidden]{display:none}
+.help-card{
+  width:min(760px,94vw);max-height:86vh;overflow:auto;
+  background:var(--rb-drawer-bg);border:1px solid var(--rb-line);border-radius:16px;
+  box-shadow:0 30px 90px rgba(0,0,0,.55);padding:24px 26px
+}
+.help-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.help-head h3{margin:0;font-size:17px;font-weight:750}
+.help-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:20px 26px}
+.help-group h4{margin:0 0 9px;font-size:11px;letter-spacing:1.4px;text-transform:uppercase;color:var(--rb-faint);font-weight:800}
+.help-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0;font-size:13px}
+.help-item .hk{
+  font-family:var(--font-mono);font-size:11.5px;font-weight:700;
+  background:var(--rb-ctl-bg);border:1px solid var(--rb-ctl-line);
+  border-bottom-width:2px;border-radius:5px;padding:3px 8px;color:var(--rb-ctl-fg);white-space:nowrap
+}
+.help-foot{margin-top:20px;padding-top:14px;border-top:1px solid var(--rb-line);font-size:12px;color:var(--rb-muted)}
+.help-foot a{color:var(--rb-blue);text-decoration:underline}

@@ -1,0 +1,2 @@
+# 统一 LF：Windows 上开发、Linux 大屏部署时不会出现整文件换行 diff
+* text=auto eol=lf

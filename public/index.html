@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RollBoard Studio · 滚榜工作台</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%234f7bff'/%3E%3Ctext x='32' y='42' font-size='26' font-family='Arial' font-weight='bold' fill='white' text-anchor='middle'%3ERB%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="/css/theme.css">
+<link rel="stylesheet" href="/css/app.css">
+<script src="/js/theme.js"></script>
+<script src="/vendor/schema.js"></script>
+<script src="/vendor/engine.js"></script>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">RB</div>
+      <div>
+        <div class="brand-name">RollBoard Studio</div>
+        <div class="brand-sub">滚榜工作台 · v1.0</div>
+      </div>
+    </div>
+    <nav class="nav">
+      <a class="nav-item active" href="#files"><span class="ni">01</span> 数据文件</a>
+      <a class="nav-item" href="#import"><span class="ni">02</span> 导入 / 演示</a>
+      <a class="nav-item" href="#schema"><span class="ni">03</span> 格式说明</a>
+      <a class="nav-item" href="/setup.html"><span class="ni">⚙</span> 配置中心</a>
+    </nav>
+    <div class="side-foot">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">正在连接本地服务…</span>
+      <button class="btn btn-ghost side-theme" id="themeBtnSide" title="切换深色 / 浅色主题（T）">◐ 浅色</button>
+      <div class="side-hint">所有数据仅保存在本机 data/ 目录</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div>
+        <h1>比赛数据 → 统一滚榜文件 → 现场滚榜</h1>
+        <p>从本地部署的 DOMjudge / HOJ 拉取指定比赛，重建封榜状态，生成可离线播放的 <code>.rboard.json</code></p>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn" id="themeBtnTop" title="切换深色 / 浅色主题（T）">◐ 浅色</button>
+        <a class="btn" href="/setup.html" title="数据源、默认值、快捷键等全部可调项">⚙ 配置</a>
+        <a class="btn btn-primary btn-lg" id="openBoard" href="/board.html" target="_blank">打开滚榜大屏 ↗</a>
+      </div>
+    </header>
+
+    <!-- 快速操作 -->
+    <section class="section" id="quick">
+      <div class="sec-head">
+        <div><h2>快速拉取</h2><p>填入比赛 ID 即可拉取；常用参数可在<a href="/setup.html" target="_blank">配置中心</a>预设为默认值。</p></div>
+        <a class="btn" href="/setup.html">更多设置</a>
+      </div>
+      <div class="panel">
+        <div class="form-grid">
+          <label class="field">
+            <span>数据源</span>
+            <select id="fSource"></select>
+          </label>
+          <label class="field">
+            <span>比赛 ID / CID</span>
+            <div class="inline">
+              <input id="fContest" placeholder="例如 3 或 nwerc18" autocomplete="off">
+              <button class="btn btn-ghost" id="listContestBtn" title="从 OJ 读取比赛列表">列表</button>
+            </div>
+          </label>
+          <label class="field">
+            <span>API 用户名 <em>（DOMjudge 需 jury/admin）</em></span>
+            <input id="fUser" placeholder="留空表示匿名访问" autocomplete="off">
+          </label>
+          <label class="field">
+            <span>API 密码 / Token <em>（仅存于本次浏览器会话，不落盘）</em></span>
+            <input id="fPass" type="password" placeholder="留空表示不记忆" autocomplete="new-password">
+          </label>
+          <label class="field wide">
+            <span>比赛标题 <em>（可留空，用 OJ 上的名称）</em></span>
+            <input id="fTitle" placeholder="例如 2026 校赛决赛">
+          </label>
+        </div>
+        <div class="actions">
+          <button class="btn" id="testBtn">测试连接</button>
+          <button class="btn btn-primary" id="fetchBtn">拉取并生成滚榜文件</button>
+          <span class="spinner" id="fetchSpin" hidden></span>
+        </div>
+        <div id="contestList" class="contest-list" hidden></div>
+        <div id="fetchResult" class="result" hidden></div>
+      </div>
+    </section>
+
+    <!-- 文件 -->
+    <section class="section" id="files">
+      <div class="sec-head">
+        <div><h2>01 · 已生成的滚榜数据文件</h2><p>每个文件都是自包含的，复制出去即可在另一台机器上离线滚榜。</p></div>
+        <button class="btn btn-ghost" id="refreshFiles">刷新</button>
+      </div>
+      <div class="panel no-pad">
+        <table class="table" id="fileTable">
+          <thead><tr><th>比赛</th><th>来源</th><th>规模</th><th>待揭示</th><th>校验</th><th>生成时间</th><th class="right">操作</th></tr></thead>
+          <tbody><tr><td colspan="7" class="empty">尚未生成任何数据文件</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 导入 -->
+    <section class="section" id="import">
+      <div class="sec-head">
+        <div><h2>02 · 导入 / 演示数据</h2><p>已经从 OJ 导出过 JSON？直接粘贴或拖入，自动识别格式并转成统一文件。</p></div>
+        <button class="btn btn-accent" id="demoBtn">生成演示比赛</button>
+      </div>
+      <div class="panel">
+        <div class="dropzone" id="dropzone">
+          <div class="dz-icon">⇪</div>
+          <div><strong>拖入 .json 文件</strong>，或在下方粘贴内容</div>
+          <div class="dz-hint">支持 rollboard/1 · DOMjudge 端点响应集合 · HOJ info + submissions</div>
+        </div>
+        <textarea id="importText" rows="6" placeholder='粘贴原始 JSON，例如 { "contest": {...}, "problems": [...], "teams": [...], "submissions": [...], "judgements": [...] }'></textarea>
+        <div class="actions">
+          <input id="importId" class="mini-input" placeholder="文件 ID（可留空）">
+          <button class="btn" id="importBtn">识别并导入</button>
+          <button class="btn btn-ghost" id="clearImport">清空</button>
+        </div>
+        <div id="importResult" class="result" hidden></div>
+      </div>
+    </section>
+
+    <!-- 格式说明 -->
+    <section class="section" id="schema">
+      <div class="sec-head"><div><h2>03 · 统一数据格式 rollboard/1</h2><p>数据源与滚榜引擎完全解耦：适配器负责产出，引擎只消费这份文件。</p></div></div>
+      <div class="panel schema-panel">
+        <pre><code>{
+  "schema": "rollboard/1",
+  "meta": {
+    "id": "2026-final", "title": "2026 校赛决赛",
+    "sourceType": "domjudge", "contestId": "3",
+    "startTime": "…ISO…", "freezeTime": "…ISO…", "endTime": "…ISO…",
+    "durationSec": 18000, "freezeSec": 14400, "penaltyMin": 20,
+    "medals": { "gold": 4, "silver": 6, "bronze": 8 }
+  },
+  "problems": [{ "id": "A", "label": "A", "name": "签到", "color": "#ef4444" }],
+  "teams":    [{ "id": "1", "name": "重生之我在ICPC拿金牌", "org": "清水河大学", "starred": false }],
+
+  // 封榜瞬间已公开的状态：attempts = AC 前错误提交数
+  "frozen": { "1": { "A": { "attempts": 1, "solved": true, "solveSec": 1240 } } },
+
+  // 仅需「待揭示」的提交：封榜后提交 + 封榜时尚未判定的提交
+  "submissions": [
+    { "id": "s812", "teamId": "1", "problemId": "F", "timeSec": 15230,
+      "verdict": "AC", "penalty": true }
+  ]
+}</code></pre>
+        <div class="schema-notes">
+          <div><b>verdict</b><br>AC / WA / TLE / MLE / RE / CE / PE / OLE / SE / PENDING</div>
+          <div><b>penalty</b><br>失败提交是否计入 20 分钟罚时；CE、PE、SE 通常为 false</div>
+          <div><b>引擎规则</b><br>焦点从最后一名逐行上移：每个揭晓都是「先高亮格子 → 下一步揭晓」；排名变动时该行上移、焦点留在原位交给被挤下来的队伍；空行不跳过（单独一步），下一步才移动焦点；一血 / 获奖单独展示。所有步骤与榜单帧在加载时一次性预计算</div>
+          <div><b>交叉校验</b><br>DOMjudge 适配器会用 jury 榜单核对重建出的最终通过数与总罚时</div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<script src="/js/api.js"></script>
+<script src="/js/theme-ui.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+{
+  "name": "rollboard-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "从 DOMjudge / HOJ 本地部署拉取比赛榜单，预处理为统一滚榜数据文件，并进行现场滚榜",
+  "type": "commonjs",
+  "main": "server.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TechieBreeze/rollboard.git"
+  },
+  "homepage": "https://github.com/TechieBreeze/rollboard#readme",
+  "bugs": {
+    "url": "https://github.com/TechieBreeze/rollboard/issues"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node --test tests/*.test.js",
+    "test:ui": "node tests/ui-regression.js",
+    "test:fx": "node tests/fx-probe.js",
+    "test:frames": "node tests/fx-frames.js",
+    "mock": "node tests/mock-oj.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
